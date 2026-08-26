@@ -1,0 +1,15 @@
+{
+  "name": "genie-eco-marketplace",
+  "owner": {
+    "name": "FEINT AI Agent Team, AMD"
+  },
+  "description": "Internal Claude Code plugin marketplace for the Genie AI ECO flow (RTL-driven, multi-stage gate-level ECO with Formality verification).",
+  "plugins": [
+    {
+      "name": "genie_eco",
+      "source": "./plugins/genie_eco",
+      "description": "Run the Genie AI ECO flow (STUDY -> APPLY -> ROUND -> FINAL) end to end from an RTL diff to a Formality-verified per-stage netlist ECO. Thin launcher: orchestration ships in the plugin; scripts/sub-agents run in place from the genie_agent repo.",
+      "author": { "name": "FEINT AI Agent Team, AMD" }
+    }
+  ]
+}

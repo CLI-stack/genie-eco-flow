@@ -1,0 +1,7 @@
+{
+  "name": "genie_eco",
+  "displayName": "Genie AI ECO Flow",
+  "description": "Run the Genie AI ECO flow (STUDY -> APPLY -> ROUND -> FINAL) end to end: RTL diff -> per-stage gate-level ECO study -> apply -> Formality verification, with hard validator gates. Thin launcher over the genie_agent repo (no EDA license bundled; uses the repo's scripts and PD/FM/LSF env in place).",
+  "author": { "name": "FEINT AI Agent Team, AMD" },
+  "version": "0.1.0"
+}

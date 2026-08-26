@@ -1,0 +1,16 @@
+# Task Waiver List for TileBuilder
+# Format: TaskName: root_cause_pattern
+# - TaskName will be checked first
+# - If blocking pattern found, root cause is extracted
+# - Root cause is matched against root_cause_pattern (regex)
+# - Only skip if root cause matches the expected pattern
+#
+# Examples:
+# GetSdc: No such file.*SDC
+# BuildTechDir: .*
+#
+# Use .* to skip ANY failure (force skip)
+# Use (pattern1|pattern2) to match multiple specific root causes
+GetSdc: (No such file.*sdc|/tool.*GetSdc\.csh)
+ShFcGetClocksXML: (file does not exist.*clocks_ddrss\.xml|/tool.*ShFcGetClocksXML\.csh)
+PlFcGenFULLCHIPTIMINGLpTypicalClkSdc: .*

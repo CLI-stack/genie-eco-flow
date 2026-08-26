@@ -1,0 +1,266 @@
+# ECO Flow — FM ABORT Pattern Library
+#
+# Source of truth for `eco_extract_fm_abort_cause.py` and `abort_recovery_agent.md`.
+# Adding a new pattern: add an entry here, no Python edit needed.
+#
+# Schema:
+#   patterns:
+#     <pattern_kind>:                    # Unique snake_case identifier
+#       abort_class: <ABORT_NETLIST|ABORT_LINK|ABORT_SVF|ABORT_OTHER>
+#       regex:       <Python regex string>
+#       multiline:   <true|false>        # default false; true → re.MULTILINE flag
+#       ignore_case: <true|false>        # default false; true → re.IGNORECASE flag
+#       severity:    <critical|high|medium|low>   # informational
+#       suggested_action: |              # multi-line string template; {match} = first regex group
+#         ...
+#       recovery:
+#         whitelist: <true|false>        # if true, abort_recovery_agent can auto-patch
+#         action:    <action_id>         # symbolic action name (consumed by recovery agent)
+#       pre_fm_check: <check_id>         # optional — pre-FM check that catches this earlier
+#
+schema_version: 1
+
+patterns:
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # ABORT_NETLIST — Verilog parse / wire decl errors
+  # ────────────────────────────────────────────────────────────────────────────
+
+  duplicate_wire_decl:
+    abort_class: ABORT_NETLIST
+    regex: "Duplicate wire/tri/wand/wor declaration for ['\"]([^'\"]+)['\"]"
+    severity: critical
+    suggested_action: |
+      Duplicate wire declaration in PostEco netlist for net {match}. Likely
+      applier inserted a wire decl for a net that already exists in the
+      netlist. Action: locate the duplicate (Step 5 Check 19 fires on this)
+      and delete one occurrence; OR fix the applier pass that emitted the
+      extra decl.
+    recovery:
+      whitelist: true
+      action: delete_duplicate_wire_decl
+    pre_fm_check: "Check 19 (duplicate_wire_decls)"
+
+  invalid_wire_decl_bracket:
+    abort_class: ABORT_NETLIST
+    regex: "^Error:.*Expected ',' or ';' but found '\\['"
+    multiline: true
+    severity: critical
+    suggested_action: |
+      Step 4 applier emitted `wire <name>[<bit>] ;` (bracket form). This is
+      illegal Verilog in a wire DECLARATION (bracket form is only valid for
+      bus-bit usage in port_connections / concatenations).
+      Fix: delete the bogus `wire <name>[<bit>] ;` line from PostEco netlists.
+      Consumers reference `<name>[<bit>]` as bus-bit access, which is fine —
+      only the wire decl is broken.
+      Typical root cause: an agent direct-edit added `wire <name>[<bit>] ;`
+      to PostEco netlists in a fix-up round instead of going through applier.
+    recovery:
+      whitelist: true
+      action: delete_bracket_wire_decl
+    pre_fm_check: "Check 22 (invalid_wire_decl_syntax)"
+
+  port_wire_size_mismatch:
+    abort_class: ABORT_NETLIST
+    regex: "Size mismatch between port & wire declaration for the port ['\"]?([^'\"]+?)['\"]?"
+    severity: critical
+    suggested_action: |
+      Wire declaration conflicts with existing port declaration's size for
+      port {match}. Almost always co-occurs with `invalid_wire_decl_bracket`
+      (the wire decl uses [N] indexing on a port name). Fix: delete the wire
+      decl line — the port is already declared elsewhere.
+    recovery:
+      whitelist: true
+      action: delete_bracket_wire_decl
+    pre_fm_check: "Check 22 (invalid_wire_decl_syntax)"
+
+  # — SPECIFIC PATTERNS first (these win over generic catch-alls below) ——————
+
+  module_redefinition:
+    abort_class: ABORT_NETLIST
+    regex: "^Error:.*Module redefinition.*['\"]?([\\w_]+)['\"]?"
+    multiline: true
+    severity: critical
+    suggested_action: |
+      Module {match} redefined — applier likely inserted a duplicate module
+      body. Revert the duplicate and re-apply.
+    recovery:
+      whitelist: true
+      action: delete_duplicate_module
+
+  indexing_non_array:
+    abort_class: ABORT_NETLIST
+    regex: "Error:\\s+Indexing into non-array ['\"]?([^'\"\\s]+)['\"]?"
+    severity: critical
+    suggested_action: |
+      Bus-bit syntax `<name>[<bit>]` used as a port_connection or concatenation
+      element on a SCALAR net/port {match}. Either declare {match} as a bus
+      (`wire [N:0] {match}`) OR rewrite consumers to use a flat-net form
+      (`{match}_<bit>_`).
+      Typical co-occurrence: a partial fix added a new flat-net for one
+      consumer but left other consumer references still in `<name>[<bit>]`
+      bracket form. After deleting the bogus wire decl
+      (invalid_wire_decl_bracket), surviving bracket consumers surface this
+      second bug. Mechanical fix: sed-replace bracket consumers with flat-net
+      form across all stages.
+    recovery:
+      whitelist: false   # Requires picking flat-net rename target; not safe blind
+      action: rename_bracket_consumers
+    pre_fm_check: "(no pre-FM check yet — could add Check 23: scalar net used as bus-bit)"
+
+  # — GENERIC CATCH-ALLS last (lower priority than specifics above) —————————
+  # These broad patterns should only "win" when no more-specific pattern matched
+  # in the same log. status_collector picks the FIRST hit per abort_class, so
+  # YAML order = priority. Keep generics at the bottom.
+
+  verilog_parse_error:
+    abort_class: ABORT_NETLIST
+    regex: "FM-599"
+    severity: critical
+    suggested_action: |
+      FM-599 generic Verilog parse error. Look for accompanying error message
+      (often `Duplicate wire`, `Syntax error`, `Module redefinition`, or
+      `Expected ',' or ';' but found '['`). Use the more-specific co-occurring
+      pattern (duplicate_wire_decl, invalid_wire_decl_bracket, etc.) for the
+      actual fix.
+    recovery:
+      whitelist: false
+      action: defer_to_specific_pattern
+
+  verilog_read_failed:
+    abort_class: ABORT_NETLIST
+    regex: "FM-001"
+    severity: critical
+    suggested_action: |
+      FM-001 Verilog read failure. The read_verilog/read_sverilog command
+      ignored the file due to errors — check for syntax issues earlier in
+      the log (look for SVR-* error codes a few lines above this).
+    recovery:
+      whitelist: false
+      action: defer_to_specific_pattern
+
+  verilog_syntax_error:
+    abort_class: ABORT_NETLIST
+    regex: "^Error:.*[Ss]yntax error"
+    multiline: true
+    severity: critical
+    suggested_action: |
+      Verilog syntax error from applier output. Check the line referenced in
+      the FM error message. Also check for co-occurring SVR-4 (Expected ','
+      or ';' but found ...) which usually pinpoints the bad token.
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # ABORT_LINK — Elaboration / port matching failures
+  # ────────────────────────────────────────────────────────────────────────────
+
+  link_failure:
+    abort_class: ABORT_LINK
+    regex: "FE-LINK-7"
+    severity: high
+    suggested_action: |
+      FE-LINK-7 elaboration failure. Usually missing port_declaration or
+      wrong cell pin name. Check Step 5 Check 16 (missing_output_port_decls)
+      and Check 15 (eco_output_pin_names) outputs.
+
+  cell_type_not_in_library:
+    abort_class: ABORT_LINK
+    regex: "Cannot link cell ['\"]?([^'\"]+?)['\"]? to its reference design ['\"]?([^'\"]+?)['\"]?\\.\\s*\\(FE-LINK-2\\)"
+    severity: critical
+    suggested_action: |
+      FE-LINK-2: cell {match!r} cannot be linked to its reference design —
+      the cell type does NOT exist in the technology library FM is loading.
+      Almost always caused by studier emitting a LOGICAL function name (NOR3,
+      AND2, NAND2) instead of the TSMC short form (NR3, AN2, ND2). Check Step
+      5 Check 21 (eco_cell_type_in_library) output for the suggested correction.
+      Re-study with corrected cell_type that matches what's already in the PreEco
+      netlist for that module.
+    recovery:
+      whitelist: true
+      action: rename_cell_type
+    pre_fm_check: "Check 21 (eco_cell_type_in_library)"
+
+  unresolved_references:
+    abort_class: ABORT_LINK
+    regex: "Unresolved references detected during link\\.\\s*\\(FM-234\\)"
+    severity: high
+    suggested_action: |
+      FM-234: One or more cell instances reference designs/types not found in
+      the loaded library. Almost always co-occurs with FE-LINK-2 — see those
+      messages for the exact cell type(s) missing. Action: fix the cell_type
+      names in eco_preeco_study.json (use TSMC short forms NR/AN/ND, not
+      logical NOR/AND/NAND).
+
+  top_design_link_failure:
+    abort_class: ABORT_LINK
+    regex: "Failed to set top design to ['\"]?([^'\"]+?)['\"]?\\.?\\s*\\(FM-156\\)"
+    severity: high
+    suggested_action: |
+      FM-156: cannot set top design {match!r} — usually a downstream symptom
+      of FE-LINK-2 / FM-234 above. Fix the upstream link errors first; this
+      will resolve automatically.
+
+  unknown_net:
+    abort_class: ABORT_LINK
+    regex: "Unknown name: ['\"]([^'\"]+)['\"].*\\(FM-036\\)"
+    severity: high
+    suggested_action: |
+      FM cannot find net {match}. Likely scope/instance path mismatch —
+      Step 1 mode_s_anchor.fm_scope must use INSTANCE names, not module-type
+      names. Re-run eco_pick_sibling.py with --tile-module.
+
+  reference_link_failure:
+    abort_class: ABORT_LINK
+    regex: "Cannot link reference design"
+    severity: high
+    suggested_action: |
+      Reference design failed to link. Check upstream Verilog read errors
+      and ensure the SynRtl bundle is intact.
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # ABORT_SVF — SVF guidance errors
+  # ────────────────────────────────────────────────────────────────────────────
+
+  svf_command_error_005:
+    abort_class: ABORT_SVF
+    regex: "CMD-005"
+    severity: medium
+    suggested_action: |
+      SVF guidance error CMD-005. Action: remove the offending SVF entry —
+      see eco_fm_pattern_library.md §B-ABORT-2.
+
+  svf_command_error_010:
+    abort_class: ABORT_SVF
+    regex: "CMD-010"
+    severity: medium
+    suggested_action: |
+      SVF guidance error CMD-010. Action: remove the offending SVF entry.
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # ABORT_OTHER — environment/resource issues (escalate to engineer, not netlist)
+  # ────────────────────────────────────────────────────────────────────────────
+
+  license_unavailable:
+    abort_class: ABORT_OTHER
+    regex: "License.*not (?:available|granted|checked out)"
+    ignore_case: true
+    severity: medium
+    suggested_action: |
+      FM license not granted. Re-run when license available; not a netlist
+      issue. ESCALATE to engineer / IT.
+
+  out_of_memory:
+    abort_class: ABORT_OTHER
+    regex: "Out of memory|OOM"
+    ignore_case: true
+    severity: medium
+    suggested_action: |
+      FM ran out of memory. Try a larger RAM machine; not a netlist issue.
+      ESCALATE to engineer.
+
+  fm_segfault:
+    abort_class: ABORT_OTHER
+    regex: "Segmentation fault"
+    severity: critical
+    suggested_action: |
+      FM segfaulted. Save the netlist and report to Synopsys; retry on a
+      different host. ESCALATE to engineer.

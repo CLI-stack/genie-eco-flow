@@ -1,0 +1,17 @@
+# Python bytecode
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Per-user workspace (created locally via `genie_cli.py --setup-user`) + per-run output
+users/
+data/
+runs/
+
+# Editor / backup clutter
+*.bak
+*.bak_*
+*.backup
+*.backup_*
+*~
+*.swp

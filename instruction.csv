@@ -1,0 +1,95 @@
+could you list out all instructions ,list_instruction.csh $tag $noLsf,45,report,,,abinbaba@amd.com
+what can you do,list_instruction.csh $tag $noLsf,45,report,,,abinbaba@amd.com
+could you start sync up a new tree at following directory ,rtg_oss_feint/sync_tree_unified.csh $refDir $ip $integer $tag $p4File ,133,start run,,,abinbaba@amd.com
+could you start sync up a new tree,rtg_oss_feint/sync_tree_unified.csh $refDir $ip $integer $tag $p4File ,133,start run,,,abinbaba@amd.com
+could you start sync up a new tree from branch below,rtg_oss_feint/sync_tree_unified.csh $refDir $ip $integer $tag $p4File ,133,start run,,,abinbaba@amd.com
+could you run cdc_rdc at following directory ,rtg_oss_feint/static_check_unified.csh $refDir $ip $tile $integer $tag $p4File $checkType,134,start run,,,abinbaba@amd.com
+could you run cdc_rdc,rtg_oss_feint/static_check_unified.csh $refDir $ip $tile $integer $tag $p4File $checkType,134,start run,,,abinbaba@amd.com
+could you run cdc_rdc from branch below,rtg_oss_feint/static_check_unified.csh $refDir $ip $tile $integer $tag $p4File $checkType,134,start run,,,abinbaba@amd.com
+could you run lint at following directory ,rtg_oss_feint/static_check_unified.csh $refDir $ip $tile $integer $tag $p4File $checkType,134,start run,,,abinbaba@amd.com
+could you run lint ,rtg_oss_feint/static_check_unified.csh $refDir $ip $tile $integer $tag $p4File $checkType,134,start run,,,abinbaba@amd.com
+could you run lint from branch below,rtg_oss_feint/static_check_unified.csh $refDir $ip $tile $integer $tag $p4File $checkType,134,start run,,,abinbaba@amd.com
+could you run spg_dft at following directory ,rtg_oss_feint/static_check_unified.csh $refDir $ip $tile $integer $tag $p4File $checkType,134,start run,,,abinbaba@amd.com
+could you run spg_dft ,rtg_oss_feint/static_check_unified.csh $refDir $ip $tile $integer $tag $p4File $checkType,134,start run,,,abinbaba@amd.com
+could you run spg_dft from branch below,rtg_oss_feint/static_check_unified.csh $refDir $ip $tile $integer $tag $p4File $checkType,134,start run,,,abinbaba@amd.com
+could you run build_rtl, rtg_oss_feint/static_check_unified.csh $refDir $ip $tile $integer $tag $p4File $checkType,134,start run,,,abinbaba@amd.com
+could you run build_rtl at following directory,rtg_oss_feint/static_check_unified.csh $refDir $ip $tile $integer $tag $p4File $checkType,134,start run,,,abinbaba@amd.com
+could you run build_rtl from branch below,rtg_oss_feint/static_check_unified.csh $refDir $ip $tile $integer $tag $p4File $checkType,134,start run,,,abinbaba@amd.com
+could you run full_static_check at following directory ,rtg_oss_feint/static_check_unified.csh $refDir $ip $tile $integer $tag $p4File $checkType,134,start run,,,abinbaba@amd.com
+could you run full_static_check ,rtg_oss_feint/static_check_unified.csh $refDir $ip $tile $integer $tag $p4File $checkType,134,start run,,,abinbaba@amd.com
+could you run full_static_check from branch below,rtg_oss_feint/static_check_unified.csh $refDir $ip $tile $integer $tag $p4File $checkType,134,start run,,,abinbaba@amd.com
+could you check what is the changelist number for the following directory,rtg_oss_feint/umc/check_cl.csh $refDir $ip $tile $integer $tag ,134,start run,,,abinbaba@amd.com
+could you update constraint at following directory,rtg_oss_feint/umc/update_cdc.csh $refDir $ip $tile $tag $updateType,134,start run,,,abinbaba@amd.com
+could you add cdc_rdc waiver at following directory,rtg_oss_feint/umc/update_cdc.csh $refDir $ip $tile $tag $updateType,134,start run,,,abinbaba@amd.com
+could you add cdc_rdc constraint at following directory,rtg_oss_feint/umc/update_cdc.csh $refDir $ip $tile $tag $updateType,134,start run,,,abinbaba@amd.com
+could you add cdc_rdc config at following directory,rtg_oss_feint/umc/update_cdc.csh $refDir $ip $tile $tag $updateType,134,start run,,,abinbaba@amd.com
+could you update cdc_rdc waiver at following directory,rtg_oss_feint/umc/update_cdc.csh $refDir $ip $tile $tag $updateType,134,start run,,,abinbaba@amd.com
+could you update cdc_rdc config at following directory,rtg_oss_feint/umc/update_cdc.csh $refDir $ip $tile $tag $updateType,134,start run,,,abinbaba@amd.com
+could you update cdc_rdc version at following directory,rtg_oss_feint/umc/update_cdc.csh $refDir $ip $tile $tag $updateType,134,start run,,,abinbaba@amd.com
+could you add lint waiver at following directory,rtg_oss_feint/umc/update_lint.csh $refDir $ip $tile $tag $updateType,134,start run,,,abinbaba@amd.com
+could you update lint waiver at following directory,rtg_oss_feint/umc/update_lint.csh $refDir $ip $tile $tag $updateType,134,start run,,,abinbaba@amd.com
+could you add lint waiver on violation below at following directory,rtg_oss_feint/umc/update_lint.csh $refDir $ip $tile $tag $updateType,134,start run,,,abinbaba@amd.com
+could you update lint waiver on violation below at following directory,rtg_oss_feint/umc/update_lint.csh $refDir $ip $tile $tag $updateType,134,start run,,,abinbaba@amd.com
+could you update status for supra run at following directory,rtg_oss_feint/supra/check_status_supra_regression.csh $refDir $tile $target $tag,134,start run,,,abinbaba@amd.com
+could you report timing and area for following directory,rtg_oss_feint/supra/synthesis_timing.csh $refDir $ip $tile $integer $tag $noLsf,134,start run,,,abinbaba@amd.com
+could you summarize the static check run at following directory ,rtg_oss_feint/umc/static_check_summary.csh $refDir $ip $tile $integer $tag ,134,start run,,,abinbaba@amd.com
+could you remove TB dir below ,rtg_oss_feint/supra/delete_tilebuilder_dir.csh $refDir $tag ,134,start run,,,abinbaba@amd.com
+could you run supra regression for target at following directory,rtg_oss_feint/supra/make_tilebuilder_run.csh $tile $refDir $target $tag ,134,start run,,,abinbaba@amd.com
+could you update the params ,rtg_oss_feint/supra/update_params.csh $tile $runDir $refDir $params $target $tag,31,update,support quoting mail,,,abinbaba@amd.com
+could you add the params ,rtg_oss_feint/supra/update_params.csh $tile $runDir $refDir $params $target $tag,31,update,support quoting mail,,,abinbaba@amd.com
+could you update params to params center,rtg_oss_feint/supra/update_params_to_center.csh $tile $runDir $refDir $tag  $noLsf,55,update,,,simon1.chen@amd.com
+could you update tune to tune center,rtg_oss_feint/supra/update_tune_to_center.csh $tile $runDir $refDir $target $file $tag  $noLsf,56,update,,,abinbaba@amd.com
+could you update params from params center,rtg_oss_feint/supra/update_params_from_center.csh $tile $runDir $refDir $tag  $noLsf,57,update,,,simon1.chen@amd.com
+could you update tune from tune center,rtg_oss_feint/supra/update_tune_from_center.csh $tile $runDir $refDir $target $tag  $noLsf,58,update,,,simon1.chen@amd.com
+could you add the command to ,rtg_oss_feint/supra/add_command_to_tune.csh $tile $runDir $refDir $tune $tag $noLsf,69,update,,,simon1.chen@amd.com
+could you add the option to,rtg_oss_feint/supra/add_command_to_tune.csh $tile $runDir $refDir $tune $tag $noLsf,69,update,,,simon1.chen@amd.com
+could you rerun the  ,rtg_oss_feint/supra/rerun_target.csh $tile $runDir $refDir $target $tag,33,update,support quoting mail,,,simon1.chen@amd.com
+could you stop run ,rtg_oss_feint/supra/stop_run.csh $tile $runDir $refDir $tag $noLsf,104,stop run,support quoting mail,,simon1.chen@amd.com
+could you branch from ,rtg_oss_feint/supra/tb_branch.csh $tile $runDir $refDir $target $params $tune $tag $table,1,start run,support quoting mail,,,simon1.chen@amd.com
+could you branch from with following params ,rtg_oss_feint/supra/tb_branch.csh $tile $runDir $refDir $target $params $tune $tag $table,1,start run,support quoting mail,,,simon1.chen@amd.com
+could you start supra regression ,rtg_oss_feint/supra/start_supra_regression_tile_ver.csh $project $tile $runDir $disk  $params $tune $tag $table $refDir,108,start run,,,abinbaba@amd.com
+could you submit files below,rtg_oss_feint/umc/submit_p4_file.csh $refDir $ip $tile $tag,135,submit,,,abinbaba@amd.com
+could you submit files below at following directory,rtg_oss_feint/umc/submit_p4_file.csh $refDir $ip $tile $tag,135,submit,,,abinbaba@amd.com
+could you list tilebuilder directories,rtg_oss_feint/supra/list_tilebuilder_dirs.csh $refDir $tag,136,list,,,abinbaba@amd.com
+could you list tilebuilder directories at following directory,rtg_oss_feint/supra/list_tilebuilder_dirs.csh $refDir $tag,136,list,,,abinbaba@amd.com
+could you update spyglass dft parameters,rtg_oss_feint/umc/update_spg_dft.csh $refDir $ip $tile $tag,137,update,,,abinbaba@amd.com
+could you update spg_dft parameters at following directory,rtg_oss_feint/umc/update_spg_dft.csh $refDir $ip $tile $tag,137,update,,,abinbaba@amd.com
+could you add spyglass dft parameters,rtg_oss_feint/umc/update_spg_dft.csh $refDir $ip $tile $tag,137,update,,,abinbaba@amd.com
+could you report utilization at following directory,rtg_oss_feint/supra/extract_utilization.csh $refDir $tag,138,start run,,,abinbaba@amd.com
+could you report utilization,rtg_oss_feint/supra/extract_utilization.csh $refDir $tag,138,start run,,,abinbaba@amd.com
+could you monitor supra run at following directory,rtg_oss_feint/supra/monitor_tilebuilder.csh $tile $refDir $target $tag,139,start run,,,abinbaba@amd.com
+could you report formality at following directory,rtg_oss_feint/supra/report_formality.csh $tile $refDir $tag,140,report,,,abinbaba@amd.com
+could you report formality,rtg_oss_feint/supra/report_formality.csh $tile $refDir $tag,140,report,,,abinbaba@amd.com
+could you analyze the clock and reset structure,rtg_oss_feint/clock_reset_analyzer.csh $file $ip $tile $refDir $tag,135,start run,,,abinbaba@amd.com
+could you analyze clock reset,rtg_oss_feint/clock_reset_analyzer.csh $file $ip $tile $refDir $tag,135,start run,,,abinbaba@amd.com
+could you analyze clock reset at following directory,rtg_oss_feint/clock_reset_analyzer.csh $file $ip $tile $refDir $tag,135,start run,,,abinbaba@amd.com
+could you analyze cdc_rdc results at following directory,analyze_only $refDir $ip $checkType $tag,134,analyze,,,abinbaba@amd.com
+could you analyze cdc_rdc at following directory,analyze_only $refDir $ip $checkType $tag,134,analyze,,,abinbaba@amd.com
+could you analyze lint results at following directory,analyze_only $refDir $ip $checkType $tag,134,analyze,,,abinbaba@amd.com
+could you analyze lint at following directory,analyze_only $refDir $ip $checkType $tag,134,analyze,,,abinbaba@amd.com
+could you analyze spg_dft results at following directory,analyze_only $refDir $ip $checkType $tag,134,analyze,,,abinbaba@amd.com
+could you analyze spg_dft at following directory,analyze_only $refDir $ip $checkType $tag,134,analyze,,,abinbaba@amd.com
+could you analyze full_static_check results at following directory,analyze_only $refDir $ip $checkType $tag,134,analyze,,,abinbaba@amd.com
+could you analyze full_static_check at following directory,analyze_only $refDir $ip $checkType $tag,134,analyze,,,abinbaba@amd.com
+could you analyze static check results at following directory,analyze_only $refDir $ip $checkType $tag,134,analyze,,,abinbaba@amd.com
+could you fix cdc_rdc at following directory,analyze_fixer_only $refDir $ip $checkType $tag,136,analyze_fixer,,,abinbaba@amd.com
+could you fix lint at following directory,analyze_fixer_only $refDir $ip $checkType $tag,136,analyze_fixer,,,abinbaba@amd.com
+could you fix spg_dft at following directory,analyze_fixer_only $refDir $ip $checkType $tag,136,analyze_fixer,,,abinbaba@amd.com
+could you analyze and fix cdc_rdc at following directory,analyze_fixer_only $refDir $ip $checkType $tag,136,analyze_fixer,,,abinbaba@amd.com
+could you analyze and fix lint at following directory,analyze_fixer_only $refDir $ip $checkType $tag,136,analyze_fixer,,,abinbaba@amd.com
+could you analyze and fix spg_dft at following directory,analyze_fixer_only $refDir $ip $checkType $tag,136,analyze_fixer,,,abinbaba@amd.com
+could you fix violations at following directory,analyze_fixer_only $refDir $ip $checkType $tag,136,analyze_fixer,,,abinbaba@amd.com
+could you find equivalent nets at following directory,rtg_oss_feint/supra/find_equivalent_nets.csh $refDir $tag $target $netName $tile,141,start run,,,abinbaba@amd.com
+could you find equivalent nets,rtg_oss_feint/supra/find_equivalent_nets.csh $refDir $tag $target $netName $tile,141,start run,,,abinbaba@amd.com
+could you run find equivalent nets at following directory,rtg_oss_feint/supra/find_equivalent_nets.csh $refDir $tag $target $netName $tile,141,start run,,,abinbaba@amd.com
+could you run find equivalent nets,rtg_oss_feint/supra/find_equivalent_nets.csh $refDir $tag $target $netName $tile,141,start run,,,abinbaba@amd.com
+could you make ECO at following directory ,rtg_oss_feint/supra/eco_analyze.csh $refDir $tag $tile $integer,134,start run,,,abinbaba@amd.com
+could you make ECO,rtg_oss_feint/supra/eco_analyze.csh $refDir $tag $tile $integer,134,start run,,,abinbaba@amd.com
+could you make eco at following directory ,rtg_oss_feint/supra/eco_analyze.csh $refDir $tag $tile $integer,134,start run,,,abinbaba@amd.com
+could you make eco,rtg_oss_feint/supra/eco_analyze.csh $refDir $tag $tile $integer,134,start run,,,abinbaba@amd.com
+could you run post eco formality at following directory ,rtg_oss_feint/supra/post_eco_formality.csh $tile $refDir $tag,134,start run,,,abinbaba@amd.com
+could you run post eco formality,rtg_oss_feint/supra/post_eco_formality.csh $tile $refDir $tag,134,start run,,,abinbaba@amd.com
+could you analyze eco at following directory ,rtg_oss_feint/supra/eco_analyze.csh $refDir $tag $tile $integer,134,start run,,,abinbaba@amd.com
+could you analyze eco,rtg_oss_feint/supra/eco_analyze.csh $refDir $tag $tile $integer,134,start run,,,abinbaba@amd.com
+could you run eco analysis at following directory ,rtg_oss_feint/supra/eco_analyze.csh $refDir $tag $tile $integer,134,start run,,,abinbaba@amd.com
+could you run eco analysis,rtg_oss_feint/supra/eco_analyze.csh $refDir $tag $tile $integer,134,start run,,,abinbaba@amd.com

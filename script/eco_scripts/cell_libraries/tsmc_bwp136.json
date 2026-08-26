@@ -1,0 +1,149 @@
+{
+  "_metadata": {
+    "library": "TSMC bwp136 family (e.g. BWP136P5M156H3P48CPDLVT, BWP136P5M117H3P48CPDLVTLL)",
+    "format": "<cell_family_prefix>: {<output_pin>: <boolean expression in input pins>}",
+    "operators": "Python boolean: ~ (not), & (and), | (or), ^ (xor)",
+    "cell_family": "extracted by regex ^([A-Z]+\\d*) before drive-strength suffix Dn",
+    "scope": "common combinational cells; extend as new ones appear in study JSON"
+  },
+  "INV": {
+    "ZN": "~I"
+  },
+  "BUF": {
+    "Z": "I"
+  },
+  "AN2": {
+    "Z": "A1 & A2"
+  },
+  "ND2": {
+    "ZN": "~(A1 & A2)"
+  },
+  "OR2": {
+    "Z": "A1 | A2"
+  },
+  "NR2": {
+    "ZN": "~(A1 | A2)"
+  },
+  "XOR2": {
+    "Z": "A1 ^ A2"
+  },
+  "XNR2": {
+    "ZN": "~(A1 ^ A2)"
+  },
+  "AN3": {
+    "Z": "A1 & A2 & A3"
+  },
+  "ND3": {
+    "ZN": "~(A1 & A2 & A3)"
+  },
+  "OR3": {
+    "Z": "A1 | A2 | A3"
+  },
+  "NR3": {
+    "ZN": "~(A1 | A2 | A3)"
+  },
+  "AN4": {
+    "Z": "A1 & A2 & A3 & A4"
+  },
+  "ND4": {
+    "ZN": "~(A1 & A2 & A3 & A4)"
+  },
+  "OR4": {
+    "Z": "A1 | A2 | A3 | A4"
+  },
+  "NR4": {
+    "ZN": "~(A1 | A2 | A3 | A4)"
+  },
+  "AOI21": {
+    "ZN": "~((A1 & A2) | B)"
+  },
+  "AOI22": {
+    "ZN": "~((A1 & A2) | (B1 & B2))"
+  },
+  "OAI21": {
+    "ZN": "~((A1 | A2) & B)"
+  },
+  "OAI22": {
+    "ZN": "~((A1 | A2) & (B1 | B2))"
+  },
+  "AO21": {
+    "Z": "(A1 & A2) | B"
+  },
+  "AO22": {
+    "Z": "(A1 & A2) | (B1 & B2)"
+  },
+  "OA21": {
+    "Z": "(A1 | A2) & B"
+  },
+  "OA22": {
+    "Z": "(A1 | A2) & (B1 | B2)"
+  },
+  "INR2": {
+    "ZN": "A1 & ~B1"
+  },
+  "IND2": {
+    "ZN": "~(~A1 & B1)"
+  },
+  "INR3": {
+    "ZN": "~(A1 | (B1 & B2))"
+  },
+  "IND3": {
+    "ZN": "~(A1 & (B1 | B2))"
+  },
+  "IINR3": {
+    "ZN": "(A1 & A2) & ~B1"
+  },
+  "IAOI21": {
+    "ZN": "~(A1 | (A2 & B))"
+  },
+  "IOAI21": {
+    "ZN": "~(A1 & (A2 | B))"
+  },
+  "NR2D1SPG1AMDBWP136P5M156H3P48CPDLVT": {
+    "ZN": "(~(A1|A2))"
+  },
+  "AOI211": {
+    "pins": {
+      "A1": "input",
+      "A2": "input",
+      "B": "input",
+      "C": "input",
+      "ZN": "output"
+    },
+    "function": "~((A1 & A2) | B | C)",
+    "output_pin": "ZN",
+    "output_is_inverting": true
+  },
+  "INR4": {
+    "pins": {
+      "A1": "input",
+      "B1": "input",
+      "B2": "input",
+      "B3": "input",
+      "ZN": "output"
+    },
+    "function": "A1 & ~B1 & ~B2 & ~B3",
+    "output_pin": "ZN",
+    "output_is_inverting": false
+  },
+  "MUX2": {
+    "pins": {
+      "I0": "input",
+      "I1": "input",
+      "S": "input",
+      "Z": "output"
+    },
+    "function": "S ? I1 : I0",
+    "output_pin": "Z",
+    "output_is_inverting": false
+  },
+  "OA12": {
+    "Z": "(A1 & (A2 | B))"
+  },
+  "AO12": {
+    "Z": "A1 | (A2 & B)"
+  },
+  "AO32": {
+    "Z": "(A1 & A2 & A3) | (B1 & B2)"
+  }
+}
