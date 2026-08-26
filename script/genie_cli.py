@@ -1662,6 +1662,24 @@ class GenieCLI:
                 os.makedirs(os.path.join(self.base_dir, 'data'), exist_ok=True)
                 os.makedirs(os.path.join(self.base_dir, 'runs'), exist_ok=True)
 
+        # eco_analyze is tile-AGNOSTIC — any tile may be used, not just those listed
+        # in assignment.csv. The generic parser only tags a token as `tile` when it
+        # matches a known assignment.csv tile, so an unlisted tile arrives empty. Here
+        # we derive it positionally from "... for <tile> <jira>": the non-path token
+        # immediately before the trailing JIRA integer. Scoped to eco_analyze only, so
+        # other commands' tile handling is unchanged.
+        if 'eco_analyze' in (script or '').lower() and arguementInfo.get('tile', 'tile') in ('tile', ''):
+            _toks = instruction_text.split()
+            for _k in range(len(_toks) - 1, 0, -1):
+                if re.fullmatch(r'\d+', _toks[_k].strip()):          # the JIRA integer
+                    _cand = _toks[_k - 1].strip().rstrip('/')
+                    if (_cand and not _cand.startswith('/')
+                            and _cand.lower() not in ('for', 'eco', 'at', 'analyze',
+                                'analyse', 'analysis', 'make', 'run', 'directory',
+                                'following', 'the')):
+                        arguementInfo['tile'] = 'tile:' + _cand
+                    break
+
         # Special handler: analyze_fixer_only — no script to run, just create _analyze and signal (fixer mode)
         if script.startswith('analyze_fixer_only'):
             ref_dir_raw = arguementInfo.get('refDir', '')
