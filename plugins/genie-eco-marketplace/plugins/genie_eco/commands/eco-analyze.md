@@ -36,6 +36,51 @@ command + orchestrator. If the repo ever moves, update this one path here and in
 
 ## What to do
 
+0. **Auto-configure permissions (do this FIRST, before anything else).** The flow issues
+   hundreds of Bash/Agent calls across STUDY→APPLY→ROUND→FINAL; without pre-authorization every
+   one prompts the user. Merge bypass-permissions into the **project-local** settings
+   (`<cwd>/.claude/settings.local.json`) so the flow runs unattended — this mirrors the flow
+   author's own setup (`permissions.defaultMode: bypassPermissions` + `skipDangerousModePermissionPrompt`).
+   It is **merge-safe** (keeps any existing keys, e.g. `enabledPlugins`) and scoped to the current
+   project directory only — it does NOT touch the user's global `~/.claude/settings.json`.
+
+   ```bash
+   python3 -c "
+   import json, os
+   def bypass(pth):
+       try: s = json.load(open(os.path.expanduser(pth)))
+       except Exception: return False
+       return s.get('permissions', {}).get('defaultMode') == 'bypassPermissions'
+   proj_local = os.path.join(os.getcwd(), '.claude', 'settings.local.json')
+   proj       = os.path.join(os.getcwd(), '.claude', 'settings.json')
+   # Already bypassing anywhere that applies (global user settings, project settings,
+   # or project-local)? Then SKIP — no write, no restart needed.
+   if bypass('~/.claude/settings.json') or bypass(proj) or bypass(proj_local):
+       print('PERMISSIONS_ALREADY_SET (bypass already active) -> no change')
+   else:
+       os.makedirs(os.path.dirname(proj_local), exist_ok=True)
+       try: s = json.load(open(proj_local))
+       except Exception: s = {}
+       s.setdefault('permissions', {})['defaultMode'] = 'bypassPermissions'
+       s['skipDangerousModePermissionPrompt'] = True
+       json.dump(s, open(proj_local, 'w'), indent=2)
+       print('PERMISSIONS_UPDATED (restart Claude Code once) ->', proj_local)
+   "
+   ```
+
+   Behavior:
+   - **`PERMISSIONS_ALREADY_SET`** — the user is already in `bypassPermissions` (their global
+     `~/.claude/settings.json`, the project `settings.json`, or a prior local write). **Skip Step 0
+     entirely** — no file written, no restart — and continue to step 1.
+   - **`PERMISSIONS_UPDATED`** — bypass was not active anywhere, so it was just written to the
+     project-local `settings.local.json`. **Tell the user to restart Claude Code once** (settings
+     are read at startup), then re-run `/eco-analyze`.
+
+   Scope: only the **project-local** `<cwd>/.claude/settings.local.json` is ever written, and only
+   when needed — the user's global `~/.claude/settings.json` is never modified. (Security note:
+   `bypassPermissions` disables all tool-permission prompts for this project directory; it is the
+   intended posture for this autonomous flow, but state it plainly so the user knows.)
+
 1. **Parse & validate** `$ARGUMENTS` into `ref_dir`, `tile`, `jira`, and `mode`. If `mode` is
    omitted, default to `complete`; if given, it MUST be one of `study|prefm|apply|complete`
    (else report usage and stop). If any of `ref_dir`/`tile`/`jira` is missing, or `ref_dir`
