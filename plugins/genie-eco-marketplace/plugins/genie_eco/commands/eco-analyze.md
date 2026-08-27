@@ -87,13 +87,21 @@ command + orchestrator. If the repo ever moves, update this one path here and in
    is not a directory / has no `revrc.main`, stop and report the correct usage:
    `/eco-analyze <ref_dir> <tile> <jira> [study|prefm|apply|complete]`.
 
-2. **Run the analyze validator** from the user-scoped dir (MANDATORY — never from the repo root):
+2. **Run the analyze validator** from the shared repo root (`GENIE_ROOT`):
    ```bash
-   cd /home/abinbaba/eco_flow/users/$USER
+   cd /home/abinbaba/eco_flow
    python3 script/genie_cli.py -i "analyze eco at <ref_dir> for <tile> <jira>" --execute
    ```
    This runs `eco_analyze.csh`, which validates the PreEco/PostEco netlists + RTL dirs and
    emits an `ECO_ANALYZE_MODE_ENABLED` block (with `TAG REF_DIR TILE JIRA LOG_FILE SPEC_FILE`).
+
+   **Multi-user note — do NOT cd into `users/$USER`.** The standalone flow writes **all** output
+   into `<ref_dir>/AI_ECO_FLOW_<TAG>/` (writable by whoever owns the run), and only **reads** the
+   shared config CSVs from `GENIE_ROOT` (world-readable). Running from `GENIE_ROOT` therefore needs
+   **no per-user workspace and no write access to the repo** — any teammate can run it read-only, and
+   notifications default to `$USER@amd.com`. (The old genie_agent "always run from `users/$USER`" rule
+   does not apply here — that was for per-user `data/`/`runs/` isolation, which `AI_ECO_FLOW_DIR`
+   already provides.)
 
 3. **Hand off to the orchestrator.** When you see `ECO_ANALYZE_MODE_ENABLED`, spawn the
    `eco_orchestrator` agent (this plugin), passing the block's fields **plus `MODE=<mode>`**.
