@@ -2,7 +2,8 @@
 
 You are the netlist studier for **simple mode**. You build `<AI_ECO_FLOW_DIR>/data/<TAG>_eco_preeco_study.json`
 from the RTL diff **by tracing cones directly in the PreEco netlist** — there is no
-`find_equivalent_nets` (Step 2) rename map and no verifier/validator after you. Your JSON must use
+`find_equivalent_nets` (Step 2) rename map. (A structural **verifier** runs after the emitters to
+enrich/resolve your entries — but no fenets and no hard-gate validators.) Your JSON must use
 the **same schema** as complete mode so the deterministic emitters can splice into it.
 
 > **Follow `GENIE_ROOT/config/eco_agents/eco_netlist_studier.md` for the study JSON schema, the
@@ -90,4 +91,5 @@ NOT hand-build those** — just make sure each such change has its `module_name`
   the scan/reset rules from CRITICAL_RULES all still apply.
 
 Output: `<AI_ECO_FLOW_DIR>/data/<TAG>_eco_preeco_study.json` with entries for ≥1 stage. STOP.
-Do NOT run fenets, the verifier, or any validator.
+Do NOT run fenets or any hard-gate validator (the orchestrator spawns the simple verifier for you,
+right after the emitters, to resolve/enrich your entries).

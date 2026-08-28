@@ -1,9 +1,10 @@
 # ECO SIMPLE Orchestrator (Steps 1, 3, 4 only — no fenets, no validators, no FM)
 
 You are the **SIMPLE-mode** ECO orchestrator. Run **Step 1 → Step 3 → Step 4** and STOP.
-There is **no** Step 2 (find_equivalent_nets), **no** Step 5/6 (pre-FM / Formality), **no**
-validators, **no** verifier agent, **no** functional precheck, **no** ROUND, **no** FINAL,
-**no** report HTML, **no** email. The entire deliverable is the Step 1/3/4 artifacts on disk.
+There is **no** Step 2 (find_equivalent_nets), **no** Step 5/6 (pre-FM / Formality), **no** hard-gate
+validators (`eco_validate_step*`, `eco_functional_precheck`), **no** ROUND, **no** FINAL, **no**
+report HTML, **no** email. Step 3 **does** run a structural **netlist verifier** (enrichment, not a
+hard gate) to make the study robust. The entire deliverable is the Step 1/3/4 artifacts on disk.
 
 > **MANDATORY FIRST:** read `GENIE_ROOT/config/eco_agents/CRITICAL_RULES_FAST.md`, then
 > `GENIE_ROOT/config/eco_agents/CRITICAL_RULES.md`. These universal correctness rules (polarity,
@@ -73,15 +74,20 @@ python3 script/eco_scripts/eco_emit_rewire_finalize.py --study $S --ref-dir <REF
 Verify each prints its `ECO_SCRIPT_LAUNCHED:` line. **No `--rename-map` is passed** — the emitters
 use their structural fallback (netlist D-net lookup / bus-bit flatten / driver trace).
 
-**3c. Resolve NET-ABSENT stragglers + confirm polarity (resolvers, not validators).** For any entry
-left with a `NET-ABSENT-IN-STAGE` leaf on PrePlace/Route, run `eco_cone_trace.py resolve` (or
-`eco_resolve_synth_internal.py`) to find the P&R equivalent net and patch it in. For every input net
-the study binds, confirm polarity with `eco_cone_trace.py polarity` against the source register Q —
-`INVERTED` → add an INV / bind the un-inverted source; `UNDETERMINED` → STOP and flag, do not guess.
-These are the structural stand-in for fenets `(+)/(-)` on P&R stages.
+**3c. Spawn the SIMPLE netlist verifier (structural enrichment — makes the study robust).** Spawn a
+background sub-agent with `GENIE_ROOT/config/eco_agents_simple/eco_netlist_verifier.md` prepended
+(pass `REF_DIR TAG BASE_DIR AI_ECO_FLOW_DIR`). It runs the complete verifier's enrichment checks
+**structurally** (no fenets): per-stage net resolution (`eco_cone_trace.py resolve` /
+`eco_resolve_synth_internal.py`, dropping the fenets priorities), a mandatory **per-stage polarity**
+check for every bound input (`eco_cone_trace.py polarity` vs the source register Q), cone
+verification, and the port-boundary / consumer-cascade / UNCONNECTED / PENDING auto-adds. It writes
+the enriched study back + `<TAG>_eco_step3_netlist_verify.rpt`. Wait for it.
 
-**CHECKPOINT:** `<TAG>_eco_preeco_study.json` has entries for ≥1 stage. **Do NOT run
-`eco_netlist_verifier`, `eco_validate_step3.py`, or `eco_functional_precheck.py`.**
+**CHECKPOINT:** `<TAG>_eco_preeco_study.json` has entries for ≥1 stage and the verify rpt exists. If
+the verifier flagged any `NET-ABSENT-IN-STAGE`, `UNRESOLVABLE`, or `polarity_undetermined` entry →
+**STOP** (simple mode must not apply an unresolved/ambiguous study — punt those changes to complete
+mode). **Do NOT run `eco_validate_step3.py` or `eco_functional_precheck.py`** — those hard-gate
+validators stay off; the simple verifier is the robustness layer.
 
 > **New-DFF ECOs:** `eco_emit_dff_entry.py` (new `new_logic_dff`) needs per-stage CP resolution the
 > rename map normally supplies. If the studier resolved the flop's CP net structurally, proceed;
