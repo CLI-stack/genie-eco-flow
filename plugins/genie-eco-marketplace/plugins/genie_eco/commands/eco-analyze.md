@@ -79,11 +79,32 @@ command + orchestrator. If the repo ever moves, update this one path here and in
    `bypassPermissions` disables all tool-permission prompts for this project directory; it is the
    intended posture for this autonomous flow, but state it plainly so the user knows.)
 
-1. **Parse & validate** `$ARGUMENTS` into `ref_dir`, `tile`, `jira`, and optional `mode`. If
-   `mode` is omitted, default to `complete`; if given it MUST be `complete` or `simple` (else
-   report usage and stop). If any of `ref_dir`/`tile`/`jira` is missing, or `ref_dir` is not a
-   directory / has no `revrc.main`, stop and report the correct usage:
-   `/genie_eco:eco-analyze <ref_dir> <tile> <jira> [complete|simple]`.
+1. **Parse & validate** `$ARGUMENTS` into `mode` (optional; default `complete`, else `complete`|`simple`)
+   and the inputs. Two input styles are accepted:
+   - **TileBuilder dir** (both modes): `<ref_dir> <tile> <jira>` where `ref_dir` is a directory with
+     `revrc.main`. This is the only style for `complete`.
+   - **direct inputs (explicit paths)** (`simple` mode ONLY): the user gives no TileBuilder dir but instead
+     the fields `RTL_BEFORE`, `RTL_AFTER` (each a `.v` file OR a directory), `NETLIST_SYNTH`,
+     `NETLIST_PREPLACE`, `NETLIST_ROUTE` (all 3 required), plus `TILE` and `JIRA` (for net naming /
+     reports). Accept them pasted in one message (`RTL_BEFORE: … RTL_AFTER: … NETLIST_SYNTH: …`) and
+     **ask for any missing field**. Then go to **step 1b**.
+
+   If `mode == complete` and no valid TileBuilder `ref_dir` is given, or any of `tile`/`jira` is
+   missing, stop with usage: `/genie_eco:eco-analyze <ref_dir> <tile> <jira> [complete|simple]`.
+
+1b. **(simple + direct-input style only) Build a shim ref_dir.** Turn the explicit paths into the
+   TileBuilder layout the flow expects, so the whole simple flow runs unchanged. Generate a `<TAG>`
+   (`date +%Y%m%d%H%M%S`) and:
+   ```bash
+   cd /home/abinbaba/eco_flow
+   python3 script/eco_scripts/eco_build_shim_refdir.py \
+       --rtl-before <RTL_BEFORE> --rtl-after <RTL_AFTER> \
+       --netlist-synth <NETLIST_SYNTH> --netlist-preplace <NETLIST_PREPLACE> --netlist-route <NETLIST_ROUTE> \
+       --tag <TAG> --workdir "$(dirname <NETLIST_SYNTH>)"
+   ```
+   It prints `SHIM_REF_DIR=<path>`. Use that as `ref_dir` for steps 2–3. **Remember the three
+   original `NETLIST_*` paths** — you write the patched result back to them in step 3b. The shim
+   symlinks the originals (read-only) and patches PostEco copies, so nothing is overwritten until 3b.
 
 2. **Run the analyze validator** from the shared repo root (`GENIE_ROOT`):
    ```bash
@@ -108,10 +129,29 @@ command + orchestrator. If the repo ever moves, update this one path here and in
    gates; `simple` runs only Steps 1,3,4 (via `config/eco_agents_simple/`) and stops. Do NOT run
    the phases yourself.
 
-4. When the orchestrator returns, relay its one-line summary (e.g. "ECO analysis complete.
-   Email sent." for complete, or the simple-mode "Steps 1,3,4 done" summary / stop reason).
+3b. **(simple + direct-input style only) Write the patched netlists back in place.** After the
+   orchestrator finishes, the patched netlists are in `<SHIM_REF_DIR>/data/PostEco/{Synthesize,PrePlace,Route}.v.gz`.
+   Overwrite each **original** `NETLIST_*` path, backing it up once (substitute the three real paths
+   for `$SYN`/`$PP`/`$RT` and the shim path for `$SHIM` — explicit per stage, no word-splitting):
+   ```bash
+   SHIM=<SHIM_REF_DIR>; SYN=<NETLIST_SYNTH>; PP=<NETLIST_PREPLACE>; RT=<NETLIST_ROUTE>
+   [ -e "$SYN.preeco_bak" ] || cp "$SYN" "$SYN.preeco_bak"; cp "$SHIM/data/PostEco/Synthesize.v.gz" "$SYN"
+   [ -e "$PP.preeco_bak"  ] || cp "$PP"  "$PP.preeco_bak";  cp "$SHIM/data/PostEco/PrePlace.v.gz"   "$PP"
+   [ -e "$RT.preeco_bak"  ] || cp "$RT"  "$RT.preeco_bak";  cp "$SHIM/data/PostEco/Route.v.gz"      "$RT"
+   ```
+   The artifacts (`eco_rtl_diff.json`, `eco_preeco_study.json`, applied JSON) remain under
+   `<SHIM_REF_DIR>/AI_ECO_FLOW_<TAG>/`.
+
+4. When the orchestrator returns, relay its one-line summary. For **complete**: e.g. "ECO analysis
+   complete. Email sent." For **simple + TileBuilder**: the "Steps 1,3,4 done" summary. For
+   **simple + direct-input**: report the 3 overwritten netlist paths + their `.preeco_bak` backups +
+   the shim artifact dir.
 
 ## Notes
+- **Input styles for `simple` mode:** either a TileBuilder `ref_dir` (positional, like complete),
+  or direct explicit fields (`RTL_BEFORE`/`RTL_AFTER` + the 3 `NETLIST_*` paths + `TILE`/`JIRA`),
+  which are turned into a shim ref_dir by `eco_build_shim_refdir.py` and written back in place with
+  `.preeco_bak`. Complete mode is TileBuilder-only (it needs Formality/PNR context).
 - Long-running phases (FM, fenets) are polled INSIDE the spawned agents, never from this
   command's session. See `agents/eco_orchestrator/AGENT.md`.
 - This command does not modify any genie_agent file; it only launches the existing flow.
