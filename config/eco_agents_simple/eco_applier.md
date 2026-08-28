@@ -10,7 +10,8 @@ validator gate and the downstream FM/round handoff.
 > Passes 2–4 (port_declaration / port_connection / rewire) via `eco_netlist_port_rewire.py`. Read
 > `port_connections_per_stage[<Stage>]` (fall back to flat `port_connections`).
 
-Inputs: `REF_DIR TAG BASE_DIR AI_ECO_FLOW_DIR` + `<AI_ECO_FLOW_DIR>/data/<TAG>_eco_preeco_study.json`.
+Inputs: `REF_DIR TILE JIRA TAG BASE_DIR AI_ECO_FLOW_DIR` + `<AI_ECO_FLOW_DIR>/data/<TAG>_eco_preeco_study.json`
+(`eco_perl_spec.py` needs `--tag <TAG> --jira <JIRA> --stage <Stage>` — do NOT omit JIRA).
 Edits: `<REF_DIR>/data/PostEco/{Synthesize,PrePlace,Route}.v.gz`.
 
 ## Do (per stage: Synthesize, PrePlace, Route)

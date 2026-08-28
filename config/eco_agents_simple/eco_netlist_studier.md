@@ -82,6 +82,34 @@ rename map) own: equality-decode combinators, `priority_force` cones, `comb_net_
 NOT hand-build those** — just make sure each such change has its `module_name` + `old_net` +
 `target_register`/`term_op`/`branch_assigns` fields so the emitter can ground it structurally.
 
+## New-DFF assembly (`new_logic_dff`) — structural, no fenets
+For **every** `new_logic_dff` change, assemble the flop with the same wrapper complete mode uses
+(`eco_emit_dff_entry.py`) — the wrapper is what guarantees the chain topology, the `SE=SI=1'b0`
+invariant, and the DFF entry shape — but feed it a **structural (empty) rename map** so it resolves
+the clock/scan pins from the netlist instead of fenets:
+```bash
+# 1. write a one-time empty rename map (structural fallback trigger)
+echo '{}' > <AI_ECO_FLOW_DIR>/data/<TAG>_empty_rename_map.json
+
+# 2. slice the single change, then emit the DFF entry
+python3 -c "import json; d=json.load(open('<AI_ECO_FLOW_DIR>/data/<TAG>_eco_rtl_diff.json')); \
+    print(json.dumps([c for c in d['changes'] if c.get('target_register')=='<TARGET_REG>'][0]))" \
+    > /tmp/<TARGET_REG>_change.json
+python3 script/eco_scripts/eco_emit_dff_entry.py \
+    --rtl-change /tmp/<TARGET_REG>_change.json --ref-dir <REF_DIR> \
+    --rename-map <AI_ECO_FLOW_DIR>/data/<TAG>_empty_rename_map.json \
+    --tag <TAG> --jira <JIRA> --tile-module <tile_module_per_stage> \
+    --base-dir <AI_ECO_FLOW_DIR> --output <AI_ECO_FLOW_DIR>/data/<TAG>_eco_dff_entry_<TARGET_REG>.json
+```
+With the empty map, `resolve_cp_per_stage` falls back to the **bare clock name** (`dff_clock` from
+the RTL diff) in all three stages — correct because clock nets are global and survive P&R renaming —
+and `resolve_neighbor_dff_si_se` greps a neighbour DFF in the host module for per-stage SI/SE. Splice
+the wrapper's per-stage output verbatim into `study[stage]` exactly as complete mode does. **Then
+verify the CP structurally**: confirm the bare-clock net resolves in EACH stage
+(`eco_cone_trace.py resolve --signal <dff_clock>`); if a stage cannot resolve it, mark that entry
+`NET-ABSENT-IN-STAGE` — do NOT guess a clock. Scan stitching stays out of scope (`SE=SI=1'b0`), same
+as complete mode.
+
 ## Correctness (no FM safety net)
 - **Cell types: copy from PreEco.** Grep the PreEco netlist for the needed function/family and copy
   the exact cell name (full VT/pitch suffix). Never invent one.

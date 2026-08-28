@@ -16,7 +16,14 @@ Inputs: `REF_DIR TAG BASE_DIR AI_ECO_FLOW_DIR` + `<AI_ECO_FLOW_DIR>/data/<TAG>_e
 `<REF_DIR>/data/PreEco/{Synthesize,PrePlace,Route}.v.gz`. Output: the same study JSON, enriched.
 
 ## Simple-mode substitutions (the ONLY differences from the complete verifier)
-1. **No fenets rename map / `SPEC_SOURCES` / `actual_wire_<stage>`.** In **Check 2 (per-stage net
+1. **No fenets rename map / `SPEC_SOURCES` / `actual_wire_<stage>`.** These files **do not exist** in
+   simple mode — the complete verifier reads `<TAG>_eco_fenets_rename_map.json`, `SPEC_SOURCES`, and
+   step-2 spec JSONs, none of which simple mode produces (there is no Step 2). Wherever the complete
+   verifier opens one of those, **do NOT abort on the missing file**: treat the rename map as `{}`,
+   treat every net's spec source as `FALLBACK` (structural), and skip the fenets-priority branch
+   entirely. The ONE fenets-substitute file that DOES exist and you MUST use is the GAP-15 classifier
+   output the orchestrator passes as `GAP15_CHECK_PATH` (`<TAG>_eco_and_term_port_check.json`) — read
+   `is_output_port`/`strategy` from it for Check 1; do not re-derive. In **Check 2 (per-stage net
    resolution)** and **Check 10 (cone verification)**, DROP the fenets priorities (the complete
    verifier's Priority `-1` and `5`). Use ONLY the structural ladder (its Priorities 0–4): bare name
    present in all stages → structural **driver trace** → **neighbour-DFF** → resolver. Run that ladder

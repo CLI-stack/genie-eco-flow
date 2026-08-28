@@ -40,12 +40,22 @@ guess — prefer punting the change to complete mode over a silent wrong insert.
 
 ## STEP 1 — RTL Diff Analysis
 Spawn a **background general-purpose sub-agent** with the content of
-`GENIE_ROOT/config/eco_agents_simple/rtl_diff_analyzer.md` prepended. Pass `REF_DIR TILE TAG BASE_DIR AI_ECO_FLOW_DIR`.
+`GENIE_ROOT/config/eco_agents_simple/rtl_diff_analyzer.md` prepended. Pass `REF_DIR TILE JIRA TAG BASE_DIR AI_ECO_FLOW_DIR`.
 Output: `<AI_ECO_FLOW_DIR>/data/<TAG>_eco_rtl_diff.json`.
 
 **CHECKPOINT:** the file exists and has ≥1 entry in `changes[]`, AND the agent-authored human-readable
 `<TAG>_eco_step1_rtl_diff.rpt` exists (the "what is this ECO" reference). **Do NOT run `eco_validate_step1.py`.**
 If empty/missing → STOP with the reason.
+
+**New-DFF changes ARE built in simple mode (structurally, no fenets).** If the RTL diff has any
+`change_type == "new_logic_dff"`, the Step-3 studier still emits it via `eco_emit_dff_entry.py` — but
+with a **structural (empty) rename map** instead of the fenets one. `eco_emit_dff_entry.py`'s
+`resolve_cp_per_stage` falls back to the **bare clock name** when a rename-map key is absent (clock
+nets are global and survive P&R renaming), and SI/SE come from `resolve_neighbor_dff_si_se` (a
+structural grep of a neighbour DFF in the host module) — neither needs fenets. Do NOT stop on
+`new_logic_dff`. The only correctness gate is the verifier's per-stage check that the resolved CP
+(bare clock) net actually **exists in each stage netlist**; if it does not resolve for some stage,
+the verifier flags that entry `NET-ABSENT-IN-STAGE` and the Step-3 CHECKPOINT (below) stops on it.
 
 ---
 
@@ -57,10 +67,22 @@ normally provides is done by **structural cone tracing** inside Step 3 (studier 
 ---
 
 ## STEP 3 — Netlist Study (structural cone tracing, no validators)
+**3-pre. GAP-15 classification (MANDATORY — the studier + verifier require it).** Run the structural
+and_term port classifier (same as complete mode; it is a classifier, not a validator):
+```bash
+python3 script/eco_scripts/eco_and_term_port_check.py \
+    --rtl-diff <AI_ECO_FLOW_DIR>/data/<TAG>_eco_rtl_diff.json --ref-dir <REF_DIR> \
+    --output <AI_ECO_FLOW_DIR>/data/<TAG>_eco_and_term_port_check.json
+```
+Verify stdout shows `ECO_SCRIPT_LAUNCHED: eco_and_term_port_check.py`. Pass
+`GAP15_CHECK_PATH=<AI_ECO_FLOW_DIR>/data/<TAG>_eco_and_term_port_check.json` to BOTH the studier
+(3a) and the verifier (3c) — they read `is_output_port`/`strategy` for each `and_term` from it and do
+NOT re-derive it. (No-op JSON if there are no `and_term` changes.)
+
 **3a.** Spawn a background sub-agent with `GENIE_ROOT/config/eco_agents_simple/eco_netlist_studier.md`
-prepended. Pass `REF_DIR TAG BASE_DIR AI_ECO_FLOW_DIR` + the RTL-diff path. It builds
-`<AI_ECO_FLOW_DIR>/data/<TAG>_eco_preeco_study.json` by tracing cones directly in the PreEco netlist
-(no fenets rename map). Wait for it.
+prepended. Pass `REF_DIR TILE JIRA TAG BASE_DIR AI_ECO_FLOW_DIR`, the RTL-diff path, and
+`GAP15_CHECK_PATH`. It builds `<AI_ECO_FLOW_DIR>/data/<TAG>_eco_preeco_study.json` by tracing cones
+directly in the PreEco netlist (no fenets rename map). Wait for it.
 
 **3b. Run the deterministic emitter chain — WITHOUT `--rename-map`** (they fall back to structural
 netlist resolution). Run from `<BASE_DIR>`, in this order (each is fail-closed; study untouched on error):
@@ -77,9 +99,15 @@ python3 script/eco_scripts/eco_emit_rewire_finalize.py --study $S --ref-dir <REF
 Verify each prints its `ECO_SCRIPT_LAUNCHED:` line. **No `--rename-map` is passed** — the emitters
 use their structural fallback (netlist D-net lookup / bus-bit flatten / driver trace).
 
+**On any emitter abort → STOP (do NOT proceed with a partial study).** Each emitter is fail-closed
+(exit 2, study untouched) when a cone leaf cannot be grounded structurally — exactly the case the
+fenets rename map would normally cover. If any emitter exits non-zero, do **not** run the remaining
+emitters, the verifier, or apply. STOP: `"emitter <name> aborted — a cone leaf is unresolvable
+without fenets; run <TAG> in complete mode."`
+
 **3c. Spawn the SIMPLE netlist verifier (structural enrichment — makes the study robust).** Spawn a
 background sub-agent with `GENIE_ROOT/config/eco_agents_simple/eco_netlist_verifier.md` prepended
-(pass `REF_DIR TAG BASE_DIR AI_ECO_FLOW_DIR`). It runs the complete verifier's enrichment checks
+(pass `REF_DIR TILE JIRA TAG BASE_DIR AI_ECO_FLOW_DIR` + `GAP15_CHECK_PATH`). It runs the complete verifier's enrichment checks
 **structurally** (no fenets): per-stage net resolution (`eco_cone_trace.py resolve` /
 `eco_resolve_synth_internal.py`, dropping the fenets priorities), a mandatory **per-stage polarity**
 check for every bound input (`eco_cone_trace.py polarity` vs the source register Q), cone
@@ -93,14 +121,13 @@ the verifier flagged any `NET-ABSENT-IN-STAGE`, `UNRESOLVABLE`, or `polarity_und
 mode). **Do NOT run `eco_validate_step3.py` or `eco_functional_precheck.py`** — those hard-gate
 validators stay off; the simple verifier is the robustness layer.
 
-> **New-DFF ECOs:** `eco_emit_dff_entry.py` (new `new_logic_dff`) needs per-stage CP resolution the
-> rename map normally supplies. If the studier resolved the flop's CP net structurally, proceed;
-> if not, STOP with `"new-DFF ECO — CP net unresolved without fenets; use complete mode for <TAG>."`
-
 ---
 
 ## STEP 4 — Apply to all 3 stages (no validators)
 Spawn a background sub-agent with `GENIE_ROOT/config/eco_agents_simple/eco_applier.md` prepended.
+Pass `REF_DIR TILE JIRA TAG BASE_DIR AI_ECO_FLOW_DIR` and the study path
+`<AI_ECO_FLOW_DIR>/data/<TAG>_eco_preeco_study.json` (the applier's `eco_perl_spec.py` needs
+`--tag <TAG> --jira <JIRA> --stage <Stage>` for `eco_*` net naming — do NOT omit JIRA).
 It applies the study into `<REF_DIR>/data/PostEco/{Synthesize,PrePlace,Route}.v.gz` via
 `eco_perl_spec.py` (gates) + `eco_netlist_port_rewire.py` (ports/rewires), one pass per stage.
 **Do NOT run `eco_validate_step4.py`, `eco_pre_fm_check.py`, or any FM script.**
