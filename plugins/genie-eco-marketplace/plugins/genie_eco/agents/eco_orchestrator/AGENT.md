@@ -21,21 +21,14 @@ Every `config/eco_agents/*.md` and `script/eco_scripts/*.py` path below is under
 `GENIE_ROOT/users/$USER`). If the repo moves, update this one path (and the `/eco-analyze` command).
 
 ## Inputs (from the ECO_ANALYZE_MODE_ENABLED block + the command)
-`TAG  REF_DIR  TILE  JIRA  LOG_FILE  SPEC_FILE  MODE`, and derive:
+`TAG  REF_DIR  TILE  JIRA  LOG_FILE  SPEC_FILE`, and derive:
 - `BASE_DIR` = parent of `LOG_FILE`'s `runs/` folder
 - `AI_ECO_FLOW_DIR` = `<REF_DIR>/AI_ECO_FLOW_<TAG>`
-- `MODE` (default `complete` if absent) — one of `study | prefm | apply | complete`.
 
-## MODE — stop points (enforce these)
-| MODE | Phases you run | Stop after |
-|---|---|---|
-| `study` | Phase A only | after STUDY verifies (do NOT check APPLY gates, do NOT spawn APPLY) |
-| `prefm` | A → B with `RUN_FM=false` | after APPLY returns (Steps 4,5 only; FM skipped) |
-| `apply` | A → B with `RUN_FM=true` | after APPLY returns (one FM pass; **never enter Phase C**) |
-| `complete` | A → B → C loop → FINAL | convergence / max rounds |
-
-Enforce MODE at the two transition points below (after STUDY, after APPLY). MODE never
-relaxes a gate — the two APPLY spawn-gates still apply for `prefm`/`apply`/`complete`.
+## What you run
+Always the full pipeline: **Phase A (STUDY) → Phase B (APPLY, Steps 4-6) → Phase C (ROUND
+loop, on FM mismatch, max 10) → FINAL**. There are no partial modes — every run goes end to end.
+The two APPLY spawn-gates below are always enforced.
 
 ## Phase spawning pattern (applies to every phase)
 ```
@@ -69,12 +62,11 @@ Wait for the auto-notification (no `Bash(sleep)` polling). Then verify
 `<AI_ECO_FLOW_DIR>/data/<TAG>_study_phase_exited.marker` + `<TAG>_phase_a_handoff.json` exist. If either
 missing → STOP with the reason.
 
-**MODE gate #1:** if `MODE == study` → say `"STUDY complete (mode=study). Steps 1-3 done; APPLY not run."`
-and **STOP here.** (Do not evaluate the APPLY gates.) Otherwise continue to Phase B.
+Then continue to Phase B.
 
 ---
 
-## Phase B — APPLY (Steps 4-6, or 4-5 when RUN_FM=false)
+## Phase B — APPLY (Steps 4-6)
 
 **MANDATORY SPAWN-LEVEL GATE #1 — structural:** before spawning APPLY, check
 `<AI_ECO_FLOW_DIR>/data/<TAG>_eco_validate_step3.json`. It is written ONLY when Step 3 passes (removed on
@@ -90,13 +82,11 @@ precheck did NOT pass (or was not run). Refusing to spawn APPLY. Re-spawn STUDY 
 <AI_ECO_FLOW_DIR>/data/<TAG>_eco_functional_precheck.json results[] with status FAIL)."` and STOP. Test existence FIRST.
 BOTH gates must pass to spawn APPLY.
 
-Set `RUN_FM = false` when `MODE == prefm`, else `RUN_FM = true`. Spawn (background):
+Spawn (background):
 ```
 PHASE B — ECO APPLY.
 READ: GENIE_ROOT/config/eco_agents/CRITICAL_RULES.md, then GENIE_ROOT/config/eco_agents/APPLY_ORCHESTRATOR.md.
-EXECUTE: Steps 4, 5 always. Run Step 6 (FM) ONLY if RUN_FM=true (Step 6 ABORT -> inline
-         abort_recovery_agent loop). If RUN_FM=false: after Step 5 passes, write next_phase:STOP
-         and exit — do NOT submit FM.
+EXECUTE: Steps 4, 5, 6 (Step 6 ABORT -> inline abort_recovery_agent loop).
 PRE-FLIGHT: verify HANDOFF_PATH + all Phase-A artifacts exist on disk.
 SCOPE: eco_applier.md, eco_pre_fm_checker.md, eco_fm_runner.md, abort_recovery_agent.md,
        eco_fm_abort_patterns.yaml, eco_perl_spec.py, eco_passes_2_4.py, eco_pre_fm_check.py,
@@ -108,25 +98,21 @@ EXIT — final actions in order:
   3. Write <AI_ECO_FLOW_DIR>/data/<TAG>_apply_phase_exited.marker
   4. One-line summary. STOP.
 INPUTS: TAG REF_DIR TILE JIRA LOG_FILE SPEC_FILE BASE_DIR AI_ECO_FLOW_DIR
-        RUN_FM=<true|false>
         HANDOFF_PATH=<AI_ECO_FLOW_DIR>/data/<TAG>_phase_a_handoff.json
 ```
 Wait for the notification; verify `<TAG>_apply_phase_exited.marker` + `<TAG>_round_handoff.json`; read
 `next_phase`.
 
-**MODE gate #2:**
-- if `MODE == prefm` → say `"PREFM complete (mode=prefm). Steps 1-5 done; FM not run."` and **STOP.**
-- if `MODE == apply` → say `"APPLY complete (mode=apply). One FM pass done: <FM result from handoff>. ROUND loop skipped."` and **STOP** (never enter Phase C, regardless of `next_phase`).
-- if `MODE == complete` → branch on `next_phase`:
-  - `ROUND` -> go to Phase C.
-  - `FINAL` -> say `"ECO analysis complete. Email sent."` (APPLY already spawned FINAL).
-  - `STOP`  -> say `"ECO analysis stopped: <reason from handoff>"`.
+**After APPLY — branch on `next_phase`:**
+- `ROUND` -> go to Phase C.
+- `FINAL` -> say `"ECO analysis complete. Email sent."` (APPLY already spawned FINAL).
+- `STOP`  -> say `"ECO analysis stopped: <reason from handoff>"`.
 
 ---
 
-## Phase C — ROUND (complete mode only; one round per spawn, max 10)
+## Phase C — ROUND (one round per spawn, max 10)
 
-**Only reached when `MODE == complete`.** While `next_phase == ROUND` and round_count < 10:
+While `next_phase == ROUND` and round_count < 10:
 
 Spawn (background):
 ```

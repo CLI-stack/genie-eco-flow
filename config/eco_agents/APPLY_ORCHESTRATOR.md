@@ -257,16 +257,6 @@ else:
 
 ## STEP 6 — PostEco Formality Verification
 
-**MODE gate — `RUN_FM=false` (prefm mode): STOP before FM.** If the input `RUN_FM` is `false`
-(default is `true` when the field is absent), Steps 4 and 5 are complete and FM must NOT be
-submitted. Do the exit sequence now and skip everything below:
-1. Write `<AI_ECO_FLOW_DIR>/data/<TAG>_round_handoff.json` with `next_phase: STOP` and
-   `reason: "prefm mode — stopped after Step 5 (pre-FM check passed); FM skipped"`.
-2. Write `<AI_ECO_FLOW_DIR>/data/<TAG>_apply_phase_exited.marker` (one-line: `exited <ISO_TIMESTAMP>`).
-3. One-line summary: `"APPLY steps 4-5 done; FM skipped (RUN_FM=false)."` — then STOP.
-
-Otherwise (`RUN_FM=true`) continue with the FM submission below.
-
 **MANDATORY pre-FM gate — verify Step 5 JSON exists and passed:**
 ```bash
 ls <AI_ECO_FLOW_DIR>/data/<TAG>_eco_pre_fm_check_round1.json
