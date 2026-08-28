@@ -27,6 +27,18 @@ Edits: `<REF_DIR>/data/PostEco/{Synthesize,PrePlace,Route}.v.gz`.
 3. Apply the port/rewire passes with `eco_netlist_port_rewire.py` per the complete applier.
 4. Write `<AI_ECO_FLOW_DIR>/data/<TAG>_eco_applied_round1.json` recording per-stage
    applied/inserted/already_applied counts.
+5. **Author the human-readable Step-4 RPT** (no script) at
+   `<AI_ECO_FLOW_DIR>/data/<TAG>_eco_step4_eco_applied.rpt` (copy to `<AI_ECO_FLOW_DIR>/`) — plain text:
+   ```
+   STEP 4 — ECO APPLIED (SIMPLE)   TAG <TAG>  JIRA <JIRA>  TILE <TILE>
+   ==================================================================
+   SUMMARY: <A> applied / <I> inserted / <AA> already_applied / <VF> verify_failed
+   Netlists patched: <REF_DIR>/data/PostEco/{Synthesize,PrePlace,Route}.v.gz  (backups .bak_<TAG>_round1)
+
+   [Synthesize]  + <inst> (<cell>) -> <net>   |   ~ <inst>.<pin>: <old> -> <new>   |   port: <...>
+   [PrePlace]  ...   [Route]  ...
+   ```
+   List every inserted cell / rewired pin / port op per stage so an engineer can confirm what landed.
 
 ## Simple-mode deltas (do NOT do these)
 - **No `eco_validate_step4.py`** — do not run the Step-4 validator gate.

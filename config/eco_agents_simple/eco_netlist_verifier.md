@@ -55,9 +55,30 @@ Check 13 (real-net preference), Check 10 (cone verification — use `eco_cone_tr
 each entry's cone leaves resolve per stage), Check 14 (A/B decompose fallback).
 
 ## Output + exit
-Write the enriched study back to `<AI_ECO_FLOW_DIR>/data/<TAG>_eco_preeco_study.json` and a short
-`<TAG>_eco_step3_netlist_verify.rpt` listing, per stage, what was resolved / auto-added / flagged.
+Write the enriched study back to `<AI_ECO_FLOW_DIR>/data/<TAG>_eco_preeco_study.json`.
+
+**Then YOU author the human-readable Step-3 RPT** (no script) at
+`<AI_ECO_FLOW_DIR>/data/<TAG>_eco_step3_netlist_study.rpt` (copy to `<AI_ECO_FLOW_DIR>/`) — the
+reference an engineer reads to see *what the gate-level ECO does*. Plain text, per stage:
+```
+STEP 3 — NETLIST STUDY (SIMPLE)   TAG <TAG>  JIRA <JIRA>  TILE <TILE>
+====================================================================
+SUMMARY: <N> new gates, <M> rewires, <P> port changes across Synthesize/PrePlace/Route
+
+[Synthesize]  module <module>
+  NEW GATE   <inst> (<cell_type>)  ->  <output_net>
+       does: <plain-English purpose, e.g. "OR-widens Term7 to add MRR">   polarity: TRUE|INVERTED
+  REWIRE     <inst>.<pin> : <old_net> -> <new_net>
+       does: <one line>
+  PORT       promote <port> into <module>  (driver/consumer: <...>)
+... one block per entry ...
+[PrePlace] ...   [Route] ...
+
+RESOLUTION NOTES: <any nets resolved via driver-trace / neighbour-DFF>
+FLAGS: <NET-ABSENT / UNRESOLVABLE / polarity_undetermined entries, or "none">
+```
+Also keep the short `<TAG>_eco_step3_netlist_verify.rpt` (what you resolved / auto-added / flagged).
 If any entry is left `NET-ABSENT-IN-STAGE`, `UNRESOLVABLE`, or `polarity_undetermined`, list them
-prominently — the orchestrator STOPS on those (simple mode must not apply an unresolved/ambiguous
-study). Do NOT run `eco_validate_step3.py` or `eco_functional_precheck.py` (those hard-gate validators
-stay off in simple mode); you are the robustness layer.
+prominently in BOTH — the orchestrator STOPS on those (simple mode must not apply an
+unresolved/ambiguous study). Do NOT run `eco_validate_step3.py` or `eco_functional_precheck.py`
+(those hard-gate validators stay off in simple mode); you are the robustness layer.

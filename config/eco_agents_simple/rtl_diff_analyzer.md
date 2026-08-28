@@ -24,4 +24,22 @@ extract ALL changes between PreEco and PostEco RTL, classify each into a `change
    OR-vs-AND-NOT) matter more here because there is no FM to catch a wrong classification — get
    them right per `rtl_diff_analyzer.md` §E rules.
 
-Output: `<AI_ECO_FLOW_DIR>/data/<TAG>_eco_rtl_diff.json` with a non-empty `changes[]`. STOP.
+## ALSO write a human-readable RPT (agent-authored — no script)
+After the JSON, **you** write `<AI_ECO_FLOW_DIR>/data/<TAG>_eco_step1_rtl_diff.rpt` (then copy to
+`<AI_ECO_FLOW_DIR>/`) so a human can tell *what this ECO is* at a glance. Write plain text:
+```
+STEP 1 — RTL DIFF (SIMPLE)   TAG <TAG>  JIRA <JIRA>  TILE <TILE>
+================================================================
+ECO INTENT: <1-3 plain-English sentences — what the RTL change does and why>
+
+CHANGES (<N> total): <count by change_type, e.g. and_term x2, wire_swap x1>
+
+[<change_type>]  module <module_name>   target <signal/register>
+    RTL:      <old expression>  ->  <new expression>
+    Meaning:  <one plain-English line: what this change makes the logic do>
+    Nets:     <old_net / nets_to_query relevant to this change>
+... one block per change ...
+```
+Make it complete and self-explanatory — this is the reference an engineer reads to evaluate the ECO.
+
+Output: `<AI_ECO_FLOW_DIR>/data/<TAG>_eco_rtl_diff.json` (non-empty `changes[]`) **and** the RPT above. STOP.

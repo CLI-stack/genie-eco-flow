@@ -4,7 +4,9 @@ You are the **SIMPLE-mode** ECO orchestrator. Run **Step 1 → Step 3 → Step 4
 There is **no** Step 2 (find_equivalent_nets), **no** Step 5/6 (pre-FM / Formality), **no** hard-gate
 validators (`eco_validate_step*`, `eco_functional_precheck`), **no** ROUND, **no** FINAL, **no**
 report HTML, **no** email. Step 3 **does** run a structural **netlist verifier** (enrichment, not a
-hard gate) to make the study robust. The entire deliverable is the Step 1/3/4 artifacts on disk.
+hard gate) to make the study robust. The deliverable is the Step 1/3/4 artifacts — the JSONs **and**
+a human-readable RPT per step, each **authored by the agent** (no report script), so an engineer can
+read exactly what the ECO is and what was applied.
 
 > **MANDATORY FIRST:** read `GENIE_ROOT/config/eco_agents/CRITICAL_RULES_FAST.md`, then
 > `GENIE_ROOT/config/eco_agents/CRITICAL_RULES.md`. These universal correctness rules (polarity,
@@ -41,7 +43,8 @@ Spawn a **background general-purpose sub-agent** with the content of
 `GENIE_ROOT/config/eco_agents_simple/rtl_diff_analyzer.md` prepended. Pass `REF_DIR TILE TAG BASE_DIR AI_ECO_FLOW_DIR`.
 Output: `<AI_ECO_FLOW_DIR>/data/<TAG>_eco_rtl_diff.json`.
 
-**CHECKPOINT:** the file exists and has ≥1 entry in `changes[]`. **Do NOT run `eco_validate_step1.py`.**
+**CHECKPOINT:** the file exists and has ≥1 entry in `changes[]`, AND the agent-authored human-readable
+`<TAG>_eco_step1_rtl_diff.rpt` exists (the "what is this ECO" reference). **Do NOT run `eco_validate_step1.py`.**
 If empty/missing → STOP with the reason.
 
 ---
@@ -83,7 +86,8 @@ check for every bound input (`eco_cone_trace.py polarity` vs the source register
 verification, and the port-boundary / consumer-cascade / UNCONNECTED / PENDING auto-adds. It writes
 the enriched study back + `<TAG>_eco_step3_netlist_verify.rpt`. Wait for it.
 
-**CHECKPOINT:** `<TAG>_eco_preeco_study.json` has entries for ≥1 stage and the verify rpt exists. If
+**CHECKPOINT:** `<TAG>_eco_preeco_study.json` has entries for ≥1 stage, and BOTH the agent-authored
+`<TAG>_eco_step3_netlist_study.rpt` (what the gate-level ECO does) and `<TAG>_eco_step3_netlist_verify.rpt` exist. If
 the verifier flagged any `NET-ABSENT-IN-STAGE`, `UNRESOLVABLE`, or `polarity_undetermined` entry →
 **STOP** (simple mode must not apply an unresolved/ambiguous study — punt those changes to complete
 mode). **Do NOT run `eco_validate_step3.py` or `eco_functional_precheck.py`** — those hard-gate
@@ -101,12 +105,15 @@ It applies the study into `<REF_DIR>/data/PostEco/{Synthesize,PrePlace,Route}.v.
 `eco_perl_spec.py` (gates) + `eco_netlist_port_rewire.py` (ports/rewires), one pass per stage.
 **Do NOT run `eco_validate_step4.py`, `eco_pre_fm_check.py`, or any FM script.**
 
-**CHECKPOINT:** each PostEco stage netlist md5 changed vs its PreEco baseline (proves gates landed),
+**CHECKPOINT:** the agent-authored `<TAG>_eco_step4_eco_applied.rpt` exists, AND each PostEco stage
+netlist md5 changed vs its PreEco baseline (proves gates landed),
 OR the stage legitimately had no entries.
 
 ---
 
 ## EXIT
 1. Write `<AI_ECO_FLOW_DIR>/data/<TAG>_simple_phase_exited.marker` (one line: `exited <ISO_TIMESTAMP>`).
-2. One-line summary: `"SIMPLE mode complete — Steps 1,3,4 done. Artifacts under <AI_ECO_FLOW_DIR>; PostEco netlists patched. No FM/validators run (simple mode)."`
+2. One-line summary: `"SIMPLE mode complete — Steps 1,3,4 done. Human-readable RPTs
+   (step1_rtl_diff / step3_netlist_study / step4_eco_applied) + JSONs under <AI_ECO_FLOW_DIR>;
+   PostEco netlists patched. No FM/validators run (simple mode)."`
 3. STOP. Do not spawn ROUND/FINAL, do not emit any phase-ready signal, do not send email.
