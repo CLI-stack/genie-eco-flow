@@ -33,11 +33,44 @@ falls back to when fenets is absent — see `eco_netlist_studier.md` Priorities 
 4. **`eco_resolve_synth_internal.py`** — for a synthesis-internal net whose driver chain is absent
    in P&R, call the resolver (backward driver / forward consumer trace) and take its per-stage net.
 
+**Prefer `eco_cone_trace.py` for steps 2–4** — it does the driver/consumer trace and register-anchor
+resolution deterministically (built on the complete-gate-boundary parser, so it never mis-reads a
+buffer/inverter):
+```bash
+python3 script/eco_scripts/eco_cone_trace.py resolve \
+    --netlist <REF_DIR>/data/PreEco/<Stage>.v.gz --module <module_name_per_stage> --signal <signal>
+# -> RESOLVED_NET=<net>   (or UNRESOLVED — then leave NET-ABSENT-IN-STAGE, do NOT guess)
+```
+
 Record the resolved names into the study entry exactly as complete mode does:
 `actual_wire_<stage>`, `cell_name_per_stage`, `pin_per_stage`, `module_name_per_stage`,
 `port_connections_per_stage`. Populate all three stages when you can resolve them; if a P&R stage
 cannot be resolved after the ladder, leave a `NET-ABSENT-IN-STAGE` marker — the orchestrator's Step
 3c runs `eco_resolve_synth_internal.py` to clean those up.
+
+## Polarity — MANDATORY (there is no fenets `(+)/(-)` to tell you)
+In complete mode Step 2 hands the studier FM-authoritative polarity (`(+)` = same, `(-)` =
+complement). Simple mode has none, so **before binding any resolved net as an input** (mux select,
+AND-enable, gate input, wire_swap old_net), determine whether it carries the signal or its
+**complement** using `eco_cone_trace.py polarity` — inversion-counting back to a known-good reference
+(the signal's **source register Q**, which is true-polarity by definition):
+```bash
+python3 script/eco_scripts/eco_cone_trace.py polarity \
+    --netlist <REF_DIR>/data/PreEco/<Stage>.v.gz --module <module> \
+    --target <resolved_net> --ref <source_reg_Q_net>[,<other_true_ref>]
+# -> POLARITY=TRUE|INVERTED|UNDETERMINED inv=<n>
+```
+Act on the result:
+- **TRUE** → use the net as-is.
+- **INVERTED** → the net carries the complement; either bind the un-inverted source, or add one
+  `INV` (`n_eco_<jira>_*` output) and bind that — record it in the entry.
+- **UNDETERMINED** → the tracer could not prove it through a pure buffer/inverter chain. **STOP and
+  flag this change** (`polarity_undetermined` in the entry) — do NOT guess. Without FM to catch a
+  wrong-polarity insert, guessing is how simple mode silently corrupts a netlist. Re-derive the
+  correct reference net, or hand this change to complete mode.
+
+Do this **per stage** — polarity can differ across Synthesize/PrePlace/Route because P&R inserts
+inverter/buffer chains independently. Never carry a Synthesize polarity verdict to Route.
 
 ## What you emit vs what the emitters emit
 Same division of labour as complete mode: **you** build the base skeleton (locate cells, confirm the

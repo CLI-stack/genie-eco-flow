@@ -22,9 +22,11 @@ There is **no FM and no validator to catch a mistake** in simple mode. Correctne
 2. **Polarity** — follow CRITICAL_RULES polarity rules; when unsure, build from unambiguous
    primitives (INV + AN2/OR2) rather than a compound cell.
 3. **Structural cone tracing** (replaces fenets) — resolve every RTL signal to its real gate-level
-   net per stage by tracing drivers/consumers in the netlist itself.
-Be conservative: if a per-stage net cannot be resolved structurally, mark it and prefer the
-Synthesize-resolved name over guessing.
+   net per stage, and its **polarity**, with `eco_cone_trace.py` (resolve / polarity / cone; built on
+   the complete-gate-boundary parser). Polarity is inversion-counted back to the signal's source
+   register Q; an `UNDETERMINED` verdict means STOP, never guess (no FM to catch a wrong polarity).
+Be conservative: if a per-stage net or its polarity cannot be resolved, mark it and stop rather than
+guess — prefer punting the change to complete mode over a silent wrong insert.
 
 ## PRE-FLIGHT
 1. `cd <REF_DIR>`; confirm `data/PreEco/SynRtl/` and `data/SynRtl/` exist.
@@ -71,10 +73,12 @@ python3 script/eco_scripts/eco_emit_rewire_finalize.py --study $S --ref-dir <REF
 Verify each prints its `ECO_SCRIPT_LAUNCHED:` line. **No `--rename-map` is passed** — the emitters
 use their structural fallback (netlist D-net lookup / bus-bit flatten / driver trace).
 
-**3c. Resolve NET-ABSENT stragglers (resolver, not a validator).** For any entry left with a
-`NET-ABSENT-IN-STAGE` leaf on PrePlace/Route, run `eco_resolve_synth_internal.py` to find the P&R
-equivalent net (backward driver / forward consumer trace) and patch it into the study. This is the
-structural stand-in for fenets on P&R stages.
+**3c. Resolve NET-ABSENT stragglers + confirm polarity (resolvers, not validators).** For any entry
+left with a `NET-ABSENT-IN-STAGE` leaf on PrePlace/Route, run `eco_cone_trace.py resolve` (or
+`eco_resolve_synth_internal.py`) to find the P&R equivalent net and patch it in. For every input net
+the study binds, confirm polarity with `eco_cone_trace.py polarity` against the source register Q —
+`INVERTED` → add an INV / bind the un-inverted source; `UNDETERMINED` → STOP and flag, do not guess.
+These are the structural stand-in for fenets `(+)/(-)` on P&R stages.
 
 **CHECKPOINT:** `<TAG>_eco_preeco_study.json` has entries for ≥1 stage. **Do NOT run
 `eco_netlist_verifier`, `eco_validate_step3.py`, or `eco_functional_precheck.py`.**
