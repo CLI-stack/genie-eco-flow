@@ -1,6 +1,6 @@
 ---
-description: Kick off the Genie AI ECO flow for an RTL change (STUDY -> APPLY -> ROUND -> FINAL).
-argument-hint: <ref_dir> <tile> <jira>
+description: Kick off the Genie AI ECO flow for an RTL change. Mode = complete (full STUDY->APPLY->ROUND->FINAL) or simple (steps 1,3,4 only).
+argument-hint: <ref_dir> <tile> <jira> [complete|simple]
 ---
 
 # /eco-analyze — Genie AI ECO entry point
@@ -21,13 +21,16 @@ command + orchestrator. If the repo ever moves, update this one path here and in
 
 ## Arguments
 
-`$ARGUMENTS` = `<ref_dir> <tile> <jira>`
+`$ARGUMENTS` = `<ref_dir> <tile> <jira> [mode]`
 - `ref_dir` — absolute path to the TileBuilder directory (must contain `revrc.main`).
 - `tile` — e.g. `umccmd`, `umcdat`, `ddrss_umc_t`.
 - `jira` — the ECO ticket number, e.g. `9899`.
+- `mode` (optional, default `complete`) — one of:
 
-The flow always runs the full pipeline: STUDY (1-3) → APPLY (4-6) → ROUND loop (on FM
-mismatch, max 10) → FINAL.
+| mode | steps | pipeline |
+|---|---|---|
+| `complete` (default) | 1-6 | STUDY (1,2,3) → APPLY (4,5,6) → ROUND loop (on FM mismatch, max 10) → FINAL. Full fenets + validators + Formality. |
+| `simple` | 1,3,4 | STUDY-lite (1 = RTL diff; **skip 2/fenets**, do structural cone tracing; 3 = study) → APPLY (4). **No** validators, verifier, pre-FM, FM, ROUND, FINAL, report, or email — the step-1/3/4 artifacts are the whole deliverable. |
 
 ## What to do
 
@@ -76,9 +79,11 @@ mismatch, max 10) → FINAL.
    `bypassPermissions` disables all tool-permission prompts for this project directory; it is the
    intended posture for this autonomous flow, but state it plainly so the user knows.)
 
-1. **Parse & validate** `$ARGUMENTS` into `ref_dir`, `tile`, `jira`. If any of
-   `ref_dir`/`tile`/`jira` is missing, or `ref_dir` is not a directory / has no `revrc.main`,
-   stop and report the correct usage: `/genie_eco:eco-analyze <ref_dir> <tile> <jira>`.
+1. **Parse & validate** `$ARGUMENTS` into `ref_dir`, `tile`, `jira`, and optional `mode`. If
+   `mode` is omitted, default to `complete`; if given it MUST be `complete` or `simple` (else
+   report usage and stop). If any of `ref_dir`/`tile`/`jira` is missing, or `ref_dir` is not a
+   directory / has no `revrc.main`, stop and report the correct usage:
+   `/genie_eco:eco-analyze <ref_dir> <tile> <jira> [complete|simple]`.
 
 2. **Run the analyze validator** from the shared repo root (`GENIE_ROOT`):
    ```bash
@@ -98,11 +103,13 @@ mismatch, max 10) → FINAL.
 
 3. **Hand off to the orchestrator.** When you see `ECO_ANALYZE_MODE_ENABLED`, spawn the
    `eco_orchestrator` agent (this plugin), passing the block's fields (`TAG REF_DIR TILE JIRA
-   LOG_FILE SPEC_FILE`). The orchestrator owns the full STUDY -> APPLY -> ROUND -> FINAL state
-   machine and all hard gates. Do NOT run the phases yourself.
+   LOG_FILE SPEC_FILE`) **plus `MODE=<mode>`** (`complete` or `simple`). The orchestrator branches
+   on MODE: `complete` runs the full STUDY -> APPLY -> ROUND -> FINAL state machine with all hard
+   gates; `simple` runs only Steps 1,3,4 (via `config/eco_agents_simple/`) and stops. Do NOT run
+   the phases yourself.
 
 4. When the orchestrator returns, relay its one-line summary (e.g. "ECO analysis complete.
-   Email sent." or the stop reason).
+   Email sent." for complete, or the simple-mode "Steps 1,3,4 done" summary / stop reason).
 
 ## Notes
 - Long-running phases (FM, fenets) are polled INSIDE the spawned agents, never from this

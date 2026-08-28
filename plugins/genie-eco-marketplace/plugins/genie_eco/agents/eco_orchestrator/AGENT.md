@@ -1,6 +1,6 @@
 ---
 name: eco_orchestrator
-description: Genie AI ECO phase state machine. Spawn after /eco-analyze emits ECO_ANALYZE_MODE_ENABLED. Runs STUDY -> APPLY -> ROUND -> FINAL as background sub-agents, enforcing hard gates between phases.
+description: Genie AI ECO phase state machine. Spawn after /eco-analyze emits ECO_ANALYZE_MODE_ENABLED. MODE=complete runs STUDY -> APPLY -> ROUND -> FINAL with hard gates; MODE=simple runs only Steps 1,3,4 via config/eco_agents_simple (no fenets/validators/FM).
 tools: Agent, Bash, Read, Write
 model: sonnet
 ---
@@ -21,14 +21,23 @@ Every `config/eco_agents/*.md` and `script/eco_scripts/*.py` path below is under
 `GENIE_ROOT/users/$USER`). If the repo moves, update this one path (and the `/eco-analyze` command).
 
 ## Inputs (from the ECO_ANALYZE_MODE_ENABLED block + the command)
-`TAG  REF_DIR  TILE  JIRA  LOG_FILE  SPEC_FILE`, and derive:
+`TAG  REF_DIR  TILE  JIRA  LOG_FILE  SPEC_FILE  MODE`, and derive:
 - `BASE_DIR` = parent of `LOG_FILE`'s `runs/` folder
 - `AI_ECO_FLOW_DIR` = `<REF_DIR>/AI_ECO_FLOW_<TAG>`
+- `MODE` (default `complete` if absent) — `complete` or `simple`.
 
-## What you run
-Always the full pipeline: **Phase A (STUDY) → Phase B (APPLY, Steps 4-6) → Phase C (ROUND
-loop, on FM mismatch, max 10) → FINAL**. There are no partial modes — every run goes end to end.
-The two APPLY spawn-gates below are always enforced.
+## MODE branch — FIRST DECISION
+- **`MODE == simple`** → do NOT run any of the phases below. Spawn ONE background sub-agent with the
+  content of `GENIE_ROOT/config/eco_agents_simple/SIMPLE_ORCHESTRATOR.md` prepended (INPUTS: `TAG
+  REF_DIR TILE JIRA LOG_FILE SPEC_FILE BASE_DIR AI_ECO_FLOW_DIR`). It runs Steps 1,3,4 only (no
+  fenets, no validators, no verifier, no pre-FM/FM, no ROUND, no FINAL). Wait for the auto-
+  notification, verify `<AI_ECO_FLOW_DIR>/data/<TAG>_simple_phase_exited.marker` exists, relay its
+  one-line summary, and **STOP**. Everything below this section is COMPLETE-mode only — skip it.
+- **`MODE == complete`** (default) → run the full pipeline below.
+
+## What you run (complete mode)
+The full pipeline: **Phase A (STUDY) → Phase B (APPLY, Steps 4-6) → Phase C (ROUND
+loop, on FM mismatch, max 10) → FINAL**. The two APPLY spawn-gates below are always enforced.
 
 ## Phase spawning pattern (applies to every phase)
 ```
