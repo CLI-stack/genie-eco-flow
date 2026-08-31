@@ -80,16 +80,30 @@ foreach rtl_dir ("data/PreEco/SynRtl" "data/SynRtl")
     endif
 end
 
-# --- Validation: PreEco netlists (mandatory — fail if missing) ---
+# --- Validation: PreEco netlists ---
+# Synthesize is MANDATORY. PrePlace/Route are OPTIONAL (a Synthesize-only run is
+# allowed, e.g. simple-mode direct inputs). A stage whose PreEco netlist is absent
+# is skipped for the rest of the flow — the present stages are collected in
+# `stages_present`. (Complete-mode TileBuilder dirs always carry all 3, so this
+# relaxation only enables the Synth-only case; it never weakens complete mode.)
 
-foreach stage ("Synthesize" "PrePlace" "Route")
-    if (! -f "$refdir_name/data/PreEco/${stage}.v.gz") then
+if (! -f "$refdir_name/data/PreEco/Synthesize.v.gz") then
+    echo "#text#" >> $specfile
+    echo "ERROR: Required PreEco netlist not found: $refdir_name/data/PreEco/Synthesize.v.gz" >> $specfile
+    echo "#text end#" >> $specfile
+    set run_status = "failed"
+    source $source_dir/script/rtg_oss_feint/finishing_task.csh
+    exit 1
+endif
+
+set stages_present = ("Synthesize")
+foreach stage ("PrePlace" "Route")
+    if (-f "$refdir_name/data/PreEco/${stage}.v.gz") then
+        set stages_present = ($stages_present $stage)
+    else
         echo "#text#" >> $specfile
-        echo "ERROR: Required PreEco netlist not found: $refdir_name/data/PreEco/${stage}.v.gz" >> $specfile
+        echo "INFO: PreEco/${stage}.v.gz not provided — Synthesize-only run, skipping $stage" >> $specfile
         echo "#text end#" >> $specfile
-        set run_status = "failed"
-        source $source_dir/script/rtg_oss_feint/finishing_task.csh
-        exit 1
     endif
 end
 
@@ -104,7 +118,7 @@ if (! -d "$refdir_name/data/PostEco") then
     exit 1
 endif
 
-foreach stage ("Synthesize" "PrePlace" "Route")
+foreach stage ($stages_present)
     if (! -f "$refdir_name/data/PostEco/${stage}.v.gz") then
         echo "#text#" >> $specfile
         echo "INFO: PostEco/${stage}.v.gz not found — copying from PreEco as baseline" >> $specfile
@@ -130,8 +144,9 @@ echo "JIRA,$jira_num" >> $specfile
 echo "TileBuilder Dir,$refdir_name" >> $specfile
 echo "PreEco RTL,$refdir_name/data/PreEco/SynRtl" >> $specfile
 echo "PostEco RTL,$refdir_name/data/SynRtl" >> $specfile
-echo "PreEco Netlists,Synthesize.v.gz + PrePlace.v.gz + Route.v.gz (verified)" >> $specfile
-echo "PostEco Netlists,Synthesize.v.gz + PrePlace.v.gz + Route.v.gz (verified or copied from PreEco)" >> $specfile
+echo "Stages,$stages_present (Synthesize mandatory; PrePlace/Route optional)" >> $specfile
+echo "PreEco Netlists,$stages_present (verified)" >> $specfile
+echo "PostEco Netlists,$stages_present (verified or copied from PreEco)" >> $specfile
 echo "Status,Validation PASSED — ECO orchestrator launching" >> $specfile
 echo "#table end#" >> $specfile
 

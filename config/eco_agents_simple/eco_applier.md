@@ -12,9 +12,13 @@ validator gate and the downstream FM/round handoff.
 
 Inputs: `REF_DIR TILE JIRA TAG BASE_DIR AI_ECO_FLOW_DIR` + `<AI_ECO_FLOW_DIR>/data/<TAG>_eco_preeco_study.json`
 (`eco_perl_spec.py` needs `--tag <TAG> --jira <JIRA> --stage <Stage>` — do NOT omit JIRA).
-Edits: `<REF_DIR>/data/PostEco/{Synthesize,PrePlace,Route}.v.gz`.
+Edits: `<REF_DIR>/data/PostEco/<Stage>.v.gz` for each stage in `STAGES`.
 
-## Do (per stage: Synthesize, PrePlace, Route)
+**STAGES = only the stages whose `<REF_DIR>/data/PreEco/<Stage>.v.gz` exists** (Synthesize always;
+PrePlace/Route only if provided — a Synthesize-only run is valid). Do NOT touch a stage that was not
+provided; there is no PostEco netlist for it.
+
+## Do (per stage in STAGES — Synthesize, and PrePlace/Route if present)
 1. Pre-flight + backup exactly as `eco_applier.md` describes (round 1: verify PostEco matches PreEco,
    create `.bak_<TAG>_round1`).
 2. Generate + run the Perl gate spec:

@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
 """
 eco_build_shim_refdir.py — Build a shim TileBuilder-style ref_dir from direct
-explicit inputs (RTL before/after + 3 netlist paths), so SIMPLE mode can run the
+explicit inputs (RTL before/after + netlist paths), so SIMPLE mode can run the
 existing flow unchanged (no TileBuilder run required).
+
+Synthesize is mandatory; PrePlace + Route are OPTIONAL — omit them for a
+Synthesize-only run (only the stages provided are materialised in the shim).
 
 Every ECO script/MD reads the fixed layout:
     <ref_dir>/data/PreEco/SynRtl/                          (RTL before)
@@ -22,8 +25,8 @@ Usage:
         --rtl-before      <path|dir> \
         --rtl-after       <path|dir> \
         --netlist-synth   <Synthesize.v.gz> \
-        --netlist-preplace <PrePlace.v.gz> \
-        --netlist-route   <Route.v.gz> \
+        [--netlist-preplace <PrePlace.v.gz>] \   # optional
+        [--netlist-route   <Route.v.gz>] \       # optional
         --tag <TAG> --workdir <dir>
 
 Prints exactly one line: `SHIM_REF_DIR=<abspath>` on success. Exit 0 = OK, 2 = bad input.
@@ -60,8 +63,10 @@ def main():
     p.add_argument('--rtl-before',      required=True)
     p.add_argument('--rtl-after',       required=True)
     p.add_argument('--netlist-synth',   required=True)
-    p.add_argument('--netlist-preplace', required=True)
-    p.add_argument('--netlist-route',   required=True)
+    p.add_argument('--netlist-preplace', default='',
+                   help='optional — omit for a Synthesize-only run')
+    p.add_argument('--netlist-route',   default='',
+                   help='optional — omit for a Synthesize-only run')
     p.add_argument('--tag',             required=True)
     p.add_argument('--workdir',         required=True,
                    help='parent dir for the shim (usually the dir of the Synthesize netlist)')
@@ -71,11 +76,12 @@ def main():
     for label, path in (('rtl-before', args.rtl_before), ('rtl-after', args.rtl_after)):
         if not os.path.exists(path):
             _abort(f"--{label} not found: {path}")
-    netlists = {
-        'Synthesize': args.netlist_synth,
-        'PrePlace':   args.netlist_preplace,
-        'Route':      args.netlist_route,
-    }
+    # Synthesize is mandatory; PrePlace/Route are optional (Synth-only run).
+    netlists = {'Synthesize': args.netlist_synth}
+    if args.netlist_preplace:
+        netlists['PrePlace'] = args.netlist_preplace
+    if args.netlist_route:
+        netlists['Route'] = args.netlist_route
     for stage, nl in netlists.items():
         if not os.path.isfile(nl):
             _abort(f"--netlist-{stage.lower()} not a file: {nl}")

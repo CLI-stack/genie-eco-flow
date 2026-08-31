@@ -15,6 +15,13 @@ Inputs: `REF_DIR TAG BASE_DIR AI_ECO_FLOW_DIR` + `<AI_ECO_FLOW_DIR>/data/<TAG>_e
 (studier skeleton + emitter gates) + `<TAG>_eco_rtl_diff.json`. Netlists:
 `<REF_DIR>/data/PreEco/{Synthesize,PrePlace,Route}.v.gz`. Output: the same study JSON, enriched.
 
+## Stage scope (Synthesize-only runs are valid)
+Process **only the stages in `STAGES`** — the subset of `{Synthesize, PrePlace, Route}` whose
+`<REF_DIR>/data/PreEco/<Stage>.v.gz` exists (Synthesize always; PrePlace/Route only if the user
+provided them). Every per-stage check below (net resolution, polarity, cone verify) runs per present
+stage only. **Never flag `NET-ABSENT-IN-STAGE` / `UNRESOLVABLE` for a stage that was not provided** —
+it is absent by design, not unresolved, and must NOT stop the flow.
+
 ## Simple-mode substitutions (the ONLY differences from the complete verifier)
 1. **No fenets rename map / `SPEC_SOURCES` / `actual_wire_<stage>`.** These files **do not exist** in
    simple mode — the complete verifier reads `<TAG>_eco_fenets_rename_map.json`, `SPEC_SOURCES`, and

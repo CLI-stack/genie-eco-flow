@@ -34,7 +34,13 @@ guess — prefer punting the change to complete mode over a silent wrong insert.
 ## PRE-FLIGHT
 1. `cd <REF_DIR>`; confirm `data/PreEco/SynRtl/` and `data/SynRtl/` exist.
 2. `mkdir -p <AI_ECO_FLOW_DIR>/data`.
-3. Return to `<BASE_DIR>` (GENIE_ROOT) for running scripts.
+3. **Determine the STAGES to process.** Synthesize is always present; PrePlace and Route are
+   **optional** (a Synthesize-only run is allowed — e.g. simple-mode direct inputs where the user
+   gave only `NETLIST_SYNTH`). Set `STAGES` = the subset of `{Synthesize, PrePlace, Route}` whose
+   `<REF_DIR>/data/PreEco/<Stage>.v.gz` **exists**. Every per-stage step below (studier, emitters,
+   verifier, applier) iterates **only** `STAGES` — never assume PrePlace/Route are present. If a
+   stage's PreEco netlist is absent, it is simply not processed (no error).
+4. Return to `<BASE_DIR>` (GENIE_ROOT) for running scripts.
 
 ---
 
@@ -123,17 +129,18 @@ validators stay off; the simple verifier is the robustness layer.
 
 ---
 
-## STEP 4 — Apply to all 3 stages (no validators)
+## STEP 4 — Apply to the present stages (no validators)
 Spawn a background sub-agent with `GENIE_ROOT/config/eco_agents_simple/eco_applier.md` prepended.
 Pass `REF_DIR TILE JIRA TAG BASE_DIR AI_ECO_FLOW_DIR` and the study path
 `<AI_ECO_FLOW_DIR>/data/<TAG>_eco_preeco_study.json` (the applier's `eco_perl_spec.py` needs
 `--tag <TAG> --jira <JIRA> --stage <Stage>` for `eco_*` net naming — do NOT omit JIRA).
-It applies the study into `<REF_DIR>/data/PostEco/{Synthesize,PrePlace,Route}.v.gz` via
-`eco_perl_spec.py` (gates) + `eco_netlist_port_rewire.py` (ports/rewires), one pass per stage.
+It applies the study into `<REF_DIR>/data/PostEco/<Stage>.v.gz` for **each stage in `STAGES`** via
+`eco_perl_spec.py` (gates) + `eco_netlist_port_rewire.py` (ports/rewires), one pass per present stage
+(Synthesize always; PrePlace/Route only if provided).
 **Do NOT run `eco_validate_step4.py`, `eco_pre_fm_check.py`, or any FM script.**
 
-**CHECKPOINT:** the agent-authored `<TAG>_eco_step4_eco_applied.rpt` exists, AND each PostEco stage
-netlist md5 changed vs its PreEco baseline (proves gates landed),
+**CHECKPOINT:** the agent-authored `<TAG>_eco_step4_eco_applied.rpt` exists, AND each **present** PostEco
+stage netlist md5 changed vs its PreEco baseline (proves gates landed),
 OR the stage legitimately had no entries.
 
 ---

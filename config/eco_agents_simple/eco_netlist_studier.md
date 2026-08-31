@@ -45,9 +45,13 @@ python3 script/eco_scripts/eco_cone_trace.py resolve \
 
 Record the resolved names into the study entry exactly as complete mode does:
 `actual_wire_<stage>`, `cell_name_per_stage`, `pin_per_stage`, `module_name_per_stage`,
-`port_connections_per_stage`. Populate all three stages when you can resolve them; if a P&R stage
-cannot be resolved after the ladder, leave a `NET-ABSENT-IN-STAGE` marker — the orchestrator's Step
-3c runs `eco_resolve_synth_internal.py` to clean those up.
+`port_connections_per_stage`. **Process only the stages in `STAGES`** — the subset of
+`{Synthesize, PrePlace, Route}` whose `<REF_DIR>/data/PreEco/<Stage>.v.gz` exists (Synthesize always;
+PrePlace/Route only if provided — a Synthesize-only run is valid). **Do NOT flag `NET-ABSENT-IN-STAGE`
+for a stage that was not provided** — it is simply absent by design, not unresolved. Populate every
+present stage when you can resolve it; if a *present* P&R stage cannot be resolved after the ladder,
+leave a `NET-ABSENT-IN-STAGE` marker — the orchestrator's Step 3c runs `eco_resolve_synth_internal.py`
+to clean those up.
 
 ## Polarity — MANDATORY (there is no fenets `(+)/(-)` to tell you)
 In complete mode Step 2 hands the studier FM-authoritative polarity (`(+)` = same, `(-)` =

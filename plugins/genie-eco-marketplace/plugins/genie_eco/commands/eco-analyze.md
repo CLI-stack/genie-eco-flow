@@ -84,10 +84,12 @@ command + orchestrator. If the repo ever moves, update this one path here and in
    - **TileBuilder dir** (both modes): `<ref_dir> <tile> <jira>` where `ref_dir` is a directory with
      `revrc.main`. This is the only style for `complete`.
    - **direct inputs (explicit paths)** (`simple` mode ONLY): the user gives no TileBuilder dir but instead
-     the fields `RTL_BEFORE`, `RTL_AFTER` (each a `.v` file OR a directory), `NETLIST_SYNTH`,
-     `NETLIST_PREPLACE`, `NETLIST_ROUTE` (all 3 required), plus `TILE` and `JIRA` (for net naming /
-     reports). Accept them pasted in one message (`RTL_BEFORE: … RTL_AFTER: … NETLIST_SYNTH: …`) and
-     **ask for any missing field**. Then go to **step 1b**.
+     the fields `RTL_BEFORE`, `RTL_AFTER` (each a `.v` file OR a directory), `NETLIST_SYNTH`
+     (**required**), `NETLIST_PREPLACE` and `NETLIST_ROUTE` (**optional** — omit for a Synthesize-only
+     run), plus `TILE` and `JIRA` (for net naming / reports). Accept them pasted in one message
+     (`RTL_BEFORE: … RTL_AFTER: … NETLIST_SYNTH: …`) and **ask only for missing REQUIRED fields**
+     (`RTL_BEFORE`, `RTL_AFTER`, `NETLIST_SYNTH`, `TILE`, `JIRA`). If the user gives only
+     `NETLIST_SYNTH`, proceed Synth-only — do NOT ask for PrePlace/Route. Then go to **step 1b**.
 
    If `mode == complete` and no valid TileBuilder `ref_dir` is given, or any of `tile`/`jira` is
    missing, stop with usage: `/genie_eco:eco-analyze <ref_dir> <tile> <jira> [complete|simple]`.
@@ -99,12 +101,15 @@ command + orchestrator. If the repo ever moves, update this one path here and in
    cd /home/abinbaba/eco_flow
    python3 script/eco_scripts/eco_build_shim_refdir.py \
        --rtl-before <RTL_BEFORE> --rtl-after <RTL_AFTER> \
-       --netlist-synth <NETLIST_SYNTH> --netlist-preplace <NETLIST_PREPLACE> --netlist-route <NETLIST_ROUTE> \
+       --netlist-synth <NETLIST_SYNTH> \
        --tag <TAG> --workdir "$(dirname <NETLIST_SYNTH>)"
+   #   Append --netlist-preplace <NETLIST_PREPLACE> and/or --netlist-route <NETLIST_ROUTE>
+   #   ONLY for the stages the user actually provided (omit for a Synthesize-only run).
    ```
-   It prints `SHIM_REF_DIR=<path>`. Use that as `ref_dir` for steps 2–3. **Remember the three
-   original `NETLIST_*` paths** — you write the patched result back to them in step 3b. The shim
-   symlinks the originals (read-only) and patches PostEco copies, so nothing is overwritten until 3b.
+   It prints `SHIM_REF_DIR=<path>`. Use that as `ref_dir` for steps 2–3. **Remember the
+   original `NETLIST_*` paths the user provided** — you write the patched result back to them in step
+   3b (only the stages given). The shim symlinks the originals (read-only) and patches PostEco copies,
+   so nothing is overwritten until 3b.
 
 2. **Run the analyze validator** from the shared repo root (`GENIE_ROOT`):
    ```bash
@@ -130,28 +135,33 @@ command + orchestrator. If the repo ever moves, update this one path here and in
    the phases yourself.
 
 3b. **(simple + direct-input style only) Write the patched netlists back in place.** After the
-   orchestrator finishes, the patched netlists are in `<SHIM_REF_DIR>/data/PostEco/{Synthesize,PrePlace,Route}.v.gz`.
-   Overwrite each **original** `NETLIST_*` path, backing it up once (substitute the three real paths
-   for `$SYN`/`$PP`/`$RT` and the shim path for `$SHIM` — explicit per stage, no word-splitting):
+   orchestrator finishes, the patched netlists are in `<SHIM_REF_DIR>/data/PostEco/<Stage>.v.gz` for
+   each stage that was provided. Overwrite each **original** `NETLIST_*` path the user gave, backing
+   it up once (explicit per stage, no word-splitting). **Run only the lines for the stages provided**
+   — skip PrePlace/Route entirely on a Synthesize-only run:
    ```bash
-   SHIM=<SHIM_REF_DIR>; SYN=<NETLIST_SYNTH>; PP=<NETLIST_PREPLACE>; RT=<NETLIST_ROUTE>
+   SHIM=<SHIM_REF_DIR>; SYN=<NETLIST_SYNTH>
    [ -e "$SYN.preeco_bak" ] || cp "$SYN" "$SYN.preeco_bak"; cp "$SHIM/data/PostEco/Synthesize.v.gz" "$SYN"
-   [ -e "$PP.preeco_bak"  ] || cp "$PP"  "$PP.preeco_bak";  cp "$SHIM/data/PostEco/PrePlace.v.gz"   "$PP"
-   [ -e "$RT.preeco_bak"  ] || cp "$RT"  "$RT.preeco_bak";  cp "$SHIM/data/PostEco/Route.v.gz"      "$RT"
+   # PrePlace — only if NETLIST_PREPLACE was provided:
+   PP=<NETLIST_PREPLACE>; [ -e "$PP.preeco_bak" ] || cp "$PP" "$PP.preeco_bak"; cp "$SHIM/data/PostEco/PrePlace.v.gz" "$PP"
+   # Route — only if NETLIST_ROUTE was provided:
+   RT=<NETLIST_ROUTE>; [ -e "$RT.preeco_bak" ] || cp "$RT" "$RT.preeco_bak"; cp "$SHIM/data/PostEco/Route.v.gz" "$RT"
    ```
    The artifacts (`eco_rtl_diff.json`, `eco_preeco_study.json`, applied JSON) remain under
    `<SHIM_REF_DIR>/AI_ECO_FLOW_<TAG>/`.
 
 4. When the orchestrator returns, relay its one-line summary. For **complete**: e.g. "ECO analysis
    complete. Email sent." For **simple + TileBuilder**: the "Steps 1,3,4 done" summary. For
-   **simple + direct-input**: report the 3 overwritten netlist paths + their `.preeco_bak` backups +
-   the shim artifact dir.
+   **simple + direct-input**: report the overwritten netlist path(s) (the stages provided) + their
+   `.preeco_bak` backups + the shim artifact dir.
 
 ## Notes
 - **Input styles for `simple` mode:** either a TileBuilder `ref_dir` (positional, like complete),
-  or direct explicit fields (`RTL_BEFORE`/`RTL_AFTER` + the 3 `NETLIST_*` paths + `TILE`/`JIRA`),
-  which are turned into a shim ref_dir by `eco_build_shim_refdir.py` and written back in place with
-  `.preeco_bak`. Complete mode is TileBuilder-only (it needs Formality/PNR context).
+  or direct explicit fields (`RTL_BEFORE`/`RTL_AFTER` + `NETLIST_SYNTH` **required**, `NETLIST_PREPLACE`
+  /`NETLIST_ROUTE` **optional** + `TILE`/`JIRA`), which are turned into a shim ref_dir by
+  `eco_build_shim_refdir.py` and written back in place with `.preeco_bak`. A Synthesize-only run is
+  allowed — the flow processes only the stages provided. Complete mode is TileBuilder-only (it needs
+  Formality/PNR context, all 3 stages).
 - Long-running phases (FM, fenets) are polled INSIDE the spawned agents, never from this
   command's session. See `agents/eco_orchestrator/AGENT.md`.
 - This command does not modify any genie_agent file; it only launches the existing flow.
