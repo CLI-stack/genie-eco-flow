@@ -440,10 +440,21 @@ def _scan_pins(gz):
 
 
 def _find_pins(inst_pins, mod, inst):
-    """Route re-uniquifies the study module with a trailing _0."""
+    """Match the study's module name against the netlist's — tolerant of the tile
+    prefix (ddrss_*_t_) AND the Route uniquify _0 suffix, consistent with _mod_key /
+    _module_netlist_body used by the builder. Complete mode passes the full
+    tile-prefixed name (exact match works); simple mode has no fenets, so the bare
+    RTL name (e.g. 'umcsdpintf' vs netlist 'ddrss_umccmd_t_umcsdpintf') flows through
+    and exact match alone would falsely fail-close the grounding gate."""
+    # fast path: exact + trailing-_0 (preserves prior behavior for full names)
     for m in (mod, mod + '_0'):
         if (m, inst) in inst_pins:
             return inst_pins[(m, inst)]
+    # prefix/uniquify-tolerant fallback: normalize both sides with _mod_key
+    want = _mod_key(mod)
+    for (km, ki), pins in inst_pins.items():
+        if ki == inst and _mod_key(km) == want:
+            return pins
     return None
 
 
