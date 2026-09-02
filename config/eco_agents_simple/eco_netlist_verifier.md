@@ -88,6 +88,15 @@ it is absent by design, not unresolved, and must NOT stop the flow.
    Run this before Check 10 (cone verification) so the freshly-threaded net is in place when cones are
    re-checked. It is the same `eco_modei_chain_input_check.py` complete mode runs — simple mode was
    simply not invoking it for and_term/gate-input leaves.
+5. **Script-bug self-fix (simple mode = evaluation, don't hard-stop on a tooling bug).** If a
+   deterministic helper you run (`eco_modei_chain_input_check.py`, `eco_cone_trace.py`,
+   `eco_resolve_synth_internal.py`, …) fails closed but you can confirm in the raw netlist/RTL that the
+   case is legitimately resolvable, do NOT stop the flow: copy the script to `/tmp/<name>_<TAG>.py`,
+   make the minimal evidence-backed bug fix (never fudge data / substitute a constant / loosen a
+   correctness gate), re-run the `/tmp` copy, continue, and note
+   `SCRIPT-SELF-FIX: <name> — <bug> → <fix>` in the verify RPT for upstreaming. Only flag/STOP when the
+   entry is *genuinely* unresolvable or ambiguous. See `SIMPLE_ORCHESTRATOR.md` Correctness-posture
+   Rule 4.
 
 ## Keep unchanged (pure structural — apply exactly as the complete verifier)
 Check 1 (GAP-15 and_term strategy, from `<TAG>_eco_and_term_port_check.json`), Check 4 (GAP-14 wire

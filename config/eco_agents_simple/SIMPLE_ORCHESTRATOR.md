@@ -31,6 +31,30 @@ There is **no FM and no validator to catch a mistake** in simple mode. Correctne
 Be conservative: if a per-stage net or its polarity cannot be resolved, mark it and stop rather than
 guess — prefer punting the change to complete mode over a silent wrong insert.
 
+4. **Script-bug self-fix — simple mode is for EVALUATION, so do NOT hard-stop on a *tooling* bug.**
+   The whole point of simple mode is to see, end-to-end, *what the ECO does* — a hard stop produces no
+   evaluation and defeats the mode. So when a deterministic script fails closed (exit 2), first decide
+   **why**:
+   - **Data/correctness fail-close** (Rules 1–3): the input is genuinely ambiguous or unresolvable —
+     polarity `UNDETERMINED`, a net truly absent in a stage, a cone leaf with no structural ground.
+     Here STOP is correct — never guess; punt the change to complete mode.
+   - **Script-bug fail-close**: you can confirm in the **raw netlist / RTL diff** that the case is
+     legitimately resolvable, but the script aborts on its **own** limitation (over-strict exact match,
+     a missing null/scalar case, a field-name mismatch, etc. — the class of bug this flow keeps
+     surfacing). Do **NOT** hard-stop. Instead:
+       1. Copy the offending script to `/tmp/<script>_<TAG>.py` — **never edit the shared repo script
+          mid-run.**
+       2. Make the **minimal, evidence-backed** fix to the `/tmp` copy. It MUST be a genuine bug fix
+          verified against the raw netlist/RTL — **NOT** fudging data, substituting a constant, or
+          loosening a correctness gate to force the study through.
+       3. Re-run the `/tmp` copy in place of the original and continue the flow.
+       4. Record it: add `SCRIPT-SELF-FIX: <script> — <bug> → <fix>` to the step RPT so the real fix
+          gets upstreamed to the repo afterward.
+   - If you cannot tell which category it is, or a fix would require guessing data → treat it as a data
+     fail-close and STOP. This rule is evaluation *resilience*, not a licence to fudge: the netlist
+     correctness bar (Rules 1–3) is unchanged — you are only routing around a **tooling** bug that
+     blocks an otherwise-correct result.
+
 ## PRE-FLIGHT
 1. `cd <REF_DIR>`; confirm `data/PreEco/SynRtl/` and `data/SynRtl/` exist.
 2. `mkdir -p <AI_ECO_FLOW_DIR>/data`.
@@ -129,13 +153,21 @@ python3 script/eco_scripts/eco_emit_rewire_finalize.py --study $S --ref-dir <REF
 Verify each prints its `ECO_SCRIPT_LAUNCHED:` line. **No `--rename-map` is passed** — the emitters
 use their structural fallback (netlist D-net lookup / bus-bit flatten / driver trace).
 
-**On any emitter abort → STOP (do NOT proceed with a partial study).** Each emitter is fail-closed
-(exit 2, study untouched) when a cone leaf cannot be grounded structurally — exactly the case the
-fenets rename map would normally cover. If any emitter exits non-zero, do **not** run the remaining
-emitters, the verifier, or apply. STOP and **relay what completed + why**:
-`"Step 3b STOPPED at emitter <name> (exit 2) — <cone leaf> unresolvable without fenets. Completed:
-Step 1 (rtl_diff), 3-pre (GAP-15), 3a (studier study), emitters <list up to the failure>. Study left
-untouched. Re-run <TAG> in complete mode for this change."`
+**On any emitter abort (exit 2) → apply the Correctness-posture Rule 4 (script-bug self-fix), do NOT
+reflexively hard-stop.** Each emitter is fail-closed (study untouched) when a cone leaf cannot be
+grounded. First decide *why* (Rule 4):
+- **Script-bug fail-close** — you can confirm in the raw netlist / RTL diff that the leaf IS
+  resolvable but the emitter aborted on its own limitation (over-strict match, missing scalar/null
+  case, field-name mismatch — the class this flow keeps hitting). Then **self-fix per Rule 4**: copy
+  the emitter to `/tmp/<name>_<TAG>.py`, make the minimal evidence-backed fix, re-run the `/tmp` copy,
+  continue the chain, and relay
+  `"Step 3b SCRIPT-SELF-FIX: <name> — <bug> → <fix>; emitter re-run OK, continuing."` (also add the
+  `SCRIPT-SELF-FIX:` line to the step-3 RPT for upstreaming).
+- **Data fail-close** — the leaf is genuinely unresolvable without fenets (Rules 1–3). Then STOP (do
+  not run the remaining emitters, verifier, or apply) and **relay what completed + why**:
+  `"Step 3b STOPPED at emitter <name> (exit 2) — <cone leaf> genuinely unresolvable without fenets.
+  Completed: Step 1, 3-pre, 3a, emitters <list>. Study untouched. Re-run <TAG> in complete mode."`
+
 If all emitters pass, **relay:** `"Step 3b OK — emitter chain clean (<list>). Next: 3c verifier."`
 
 **3c. Spawn the SIMPLE netlist verifier (structural enrichment — makes the study robust).** Spawn a

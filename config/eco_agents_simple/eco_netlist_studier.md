@@ -121,6 +121,13 @@ as complete mode.
   compound cell's polarity is uncertain.
 - **Per-bit distinct gates**, **shared-chain = add parallel gates (never modify in place)**, and
   the scan/reset rules from CRITICAL_RULES all still apply.
+- **Script-bug self-fix (simple mode = evaluation, don't hard-stop on a tooling bug).** If a
+  deterministic helper you run (`eco_cone_trace.py`, `eco_resolve_synth_internal.py`,
+  `eco_emit_dff_entry.py`, …) fails closed but you can confirm in the raw netlist/RTL that the case is
+  legitimately resolvable, do NOT stop: copy the script to `/tmp/<name>_<TAG>.py`, make the minimal
+  evidence-backed bug fix (never fudge data), re-run the `/tmp` copy, continue, and note
+  `SCRIPT-SELF-FIX: <name> — <bug> → <fix>` in the RPT. Only STOP when the input is *genuinely*
+  unresolvable/ambiguous (Rules 1–3 in `SIMPLE_ORCHESTRATOR.md`). See its Correctness-posture Rule 4.
 
 Output: `<AI_ECO_FLOW_DIR>/data/<TAG>_eco_preeco_study.json` with entries for ≥1 stage. STOP.
 Do NOT run fenets or any hard-gate validator (the orchestrator spawns the simple verifier for you,
