@@ -574,6 +574,33 @@ def main():
             if isinstance(v, str) and not v.startswith('n_eco_') and v not in input_names:
                 input_names.append(v)
 
+    # ── Reset fold into the D-cone ────────────────────────────────────────
+    # This emitter keeps SE/SI=1'b0 and BAKES THE RESET INTO THE D-CONE
+    # (reset_pin_used=False). But it only worked when d_input_expected_function
+    # already contained the reset. In simple mode the studier hands the bare data
+    # function (e.g. "REG_UmcCfgEco_12_") with the reset only in `reset_signal`, so
+    # the reset was SILENTLY DROPPED — the new flop loaded data even under reset and
+    # never cleared (10299: EcoDisBlkScrubReqBefDramRdy; complete mode built
+    # `cfg[12] & ~IReset`, simple built just `cfg[12]`). Fold it deterministically:
+    #   R = reset-active expr (active_high -> reset_sig ; active_low -> ~reset_sig)
+    #   reset to 0 -> D = (data) & ~R      reset to 1 -> D = (data) | R
+    reset_sig = rtl_change.get('reset_signal', '')
+    reset_pol = (rtl_change.get('reset_polarity', 'active_high') or 'active_high').lower()
+    _rv       = str(rtl_change.get('reset_value', 0)).strip()
+    reset_to_one = _rv in ('1', "1'b1", "0b1", 'True')
+    if reset_sig and expr and not re.search(rf'\b{re.escape(reset_sig)}\b', expr):
+        # The chain is empty in simple mode, so input_names is empty — seed it with
+        # the data expr's identifiers before synthesizing the folded boolean.
+        for _tok in re.findall(r"[A-Za-z_]\w*", expr):
+            if _tok not in input_names:
+                input_names.append(_tok)
+        R = f'~{reset_sig}' if 'low' in reset_pol else reset_sig
+        expr = f'({expr}) | ({R})' if reset_to_one else f'({expr}) & ~({R})'
+        if reset_sig not in input_names:
+            input_names.append(reset_sig)
+        print(f'  reset fold: baked {reset_sig} ({reset_pol} -> {"1" if reset_to_one else "0"}) '
+              f'into D-cone: D = {expr}', file=sys.stderr)
+
     print(f'eco_emit_dff_entry: target={target_reg}  host={host_module}  clk={dff_clock}',
           file=sys.stderr)
 
