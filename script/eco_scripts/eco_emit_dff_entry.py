@@ -190,17 +190,54 @@ def decide_mode_s_strategy(host_module, ref_dir, tile_module, dff_clock,
 
 # ── Step B: Per-stage CP/SI/SE resolution ───────────────────────────────────
 
-def resolve_cp_per_stage(rename_map, host_scope, dff_clock):
-    """Resolve CP per stage from rename map. Falls back to original name if
-    not in map (caller should grep stage netlists to verify)."""
+def _clock_drives_flops(ref_dir, stage, clock):
+    """True iff `clock` appears as an exact flop clock pin `.CP(<clock>)` in the
+    stage's PreEco netlist — i.e. it is a real clock net other flops connect to.
+    UCLK01 survives CTS as the tree-root source and still clocks flops directly,
+    so this stays true in Route even after CTS renames most datapath clocks to
+    FxCts_ZCTSNET_* leaves."""
+    if not (ref_dir and clock):
+        return False
+    gz = Path(ref_dir) / 'data' / 'PreEco' / f'{stage}.v.gz'
+    if not gz.is_file():
+        return False
+    try:
+        cmd = f"zcat {gz} | grep -m1 -E '\\.CP\\s*\\(\\s*{re.escape(clock)}\\s*\\)'"
+        r = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=120)
+        return bool((r.stdout or '').strip())
+    except Exception:
+        return False
+
+
+def resolve_cp_per_stage(rename_map, host_scope, dff_clock, ref_dir=None):
+    """Resolve the new flop's CP net per stage. Priority:
+      1. rename_map value (complete mode / fenets).
+      2. bare `dff_clock` IF it still drives flops (`.CP(<clock>)`) in that stage's
+         netlist — GUARANTEED correct because it IS the clock the RTL specifies.
+      3. else UNRESOLVED — do NOT substitute a CTS leaf or a gated variant. In
+         simple mode there is no FM to catch a wrong-clock insert, and an ungated
+         RTL flop must not be silently moved onto a gated/rebalanced clock.
+    A stage whose netlist is absent (Synth-only run) is 'stage_absent', not a flag.
+    Returns (cp_per_stage, cp_status) with cp_status[stage] in
+    {'rename_map','bare_clock_verified','bare_clock_unverified','stage_absent','UNRESOLVED'}."""
     key = f'{host_scope}/{dff_clock}'
     entry = (rename_map or {}).get(key, {}) or {}
-    out = {}
+    cp, status = {}, {}
     for stage in ('Synthesize', 'PrePlace', 'Route'):
         v = entry.get(stage, '') if isinstance(entry, dict) else ''
-        # Strip trailing /pin (e.g. 'X_reg/CP' → 'X_reg' or just use as-is)
-        out[stage] = v or dff_clock
-    return out
+        if v:
+            cp[stage], status[stage] = v, 'rename_map'
+            continue
+        gz = Path(ref_dir) / 'data' / 'PreEco' / f'{stage}.v.gz' if ref_dir else None
+        if ref_dir and gz is not None and not gz.is_file():
+            cp[stage], status[stage] = dff_clock, 'stage_absent'
+        elif _clock_drives_flops(ref_dir, stage, dff_clock):
+            cp[stage], status[stage] = dff_clock, 'bare_clock_verified'
+        elif not ref_dir:
+            cp[stage], status[stage] = dff_clock, 'bare_clock_unverified'
+        else:
+            cp[stage], status[stage] = dff_clock, 'UNRESOLVED'
+    return cp, status
 
 
 def resolve_neighbor_dff_si_se(host_module, ref_dir):
@@ -549,7 +586,11 @@ def main():
 
     # ── Step B: per-stage CP/SI/SE ────────────────────────────────────────
     host_scope = rtl_change.get('host_scope', '') or rtl_change.get('hierarchy', '')
-    cp_per_stage = resolve_cp_per_stage(rmap, host_scope, dff_clock)
+    cp_per_stage, cp_status = resolve_cp_per_stage(rmap, host_scope, dff_clock, args.ref_dir)
+    _cp_unresolved = [st for st, s in cp_status.items() if s == 'UNRESOLVED']
+    print(f'  CP per stage: '
+          + ', '.join(f'{st}={cp_per_stage[st]}({cp_status[st]})' for st in
+                      ('Synthesize', 'PrePlace', 'Route')), file=sys.stderr)
 
     # --shadow-cp-net override: replace CP with the ECO shadow clock gate Q
     # output for all stages. Used when the DFF shares the same shadow gate as
@@ -1019,6 +1060,7 @@ def main():
             'modei_check':    modei_diagnostics,
             'modei_entries_added': len(modei_extra_entries),
             'bus_width':      bus_width,
+            'cp_resolution':  cp_status,
         },
     }
     if plumbing:
@@ -1027,8 +1069,18 @@ def main():
 
     # Self-validate
     issues = self_validate(out, args.ref_dir)
+    # Fail-closed on an unresolved clock: never emit a new flop whose CP net cannot
+    # be structurally confirmed as the real clock in a present stage — a wrong/guessed
+    # clock is silent functional corruption with no FM to catch it in simple mode.
+    if _cp_unresolved:
+        issues.append(
+            f"CP-UNRESOLVED: dff_clock {dff_clock!r} does not drive any flop "
+            f"(.CP({dff_clock})) in stage(s) {_cp_unresolved} — cannot confirm the "
+            f"new flop's clock structurally. Re-derive per-stage CP (fenets/complete "
+            f"mode) or hand this change to complete mode; do NOT guess a CTS leaf.")
     out['diagnostics']['self_validation_issues'] = issues
     out['diagnostics']['self_validation_pass']   = (len(issues) == 0)
+    out['diagnostics']['cp_unresolved_stages']   = _cp_unresolved
 
     Path(args.output).write_text(json.dumps(out, indent=2))
     print(f'ECO_RPT_GENERATED: dff entry → {args.output}', file=sys.stderr)
