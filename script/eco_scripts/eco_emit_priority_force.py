@@ -461,7 +461,7 @@ def _find_pins(inst_pins, mod, inst):
 def _mod_key(n):
     """Canonical module key: strip tile prefix (ddrss_*_t_) + uniquify suffix (_<i>)
     so a change's short name matches the netlist's prefixed/uniquified name."""
-    return re.sub(r'_\d+$', '', re.sub(r'^ddrss_\w+?_t_', '', str(n or '')))
+    return re.sub(r'_\d+$', '', re.sub(r'^\w+?_t_', '', str(n or '')))
 
 
 _MOD_BODY_CACHE = {}
@@ -633,7 +633,7 @@ def emit(rtl_diff, study, jira, ref_dir=None, rename_map=None):
             continue
         anchor = next((f for f in (c.get('forced_signals') or []) if f.get('const_macro')), None)
         if ref_dir and extract_added_branch_condition and anchor:
-            base = re.sub(r'^ddrss_\w+?_t_', '', mod)
+            base = re.sub(r'^\w+?_t_', '', mod)
             added_branches = extract_added_branch_condition(ref_dir, base, anchor['signal'], anchor['const_macro'])
             if len(added_branches) > 1:
                 errs.append(f"priority_force {mod}: the ECO diff adds {len(added_branches)} branches "
@@ -661,7 +661,7 @@ def emit(rtl_diff, study, jira, ref_dir=None, rename_map=None):
         _cells = _resolve_cells(ref_dir, mod) if ref_dir else _DEFAULT_CELLS
         cond = None
         if cond_expr and cfg is not None:
-            rtl = resolve_rtl(ref_dir=ref_dir, module=re.sub(r'^ddrss_\w+?_t_', '', mod)) if resolve_rtl else None
+            rtl = resolve_rtl(ref_dir=ref_dir, module=re.sub(r'^\w+?_t_', '', mod)) if resolve_rtl else None
             rtl_text = open(rtl, errors='replace').read() if rtl and os.path.isfile(rtl) else None
             try:
                 cond, cone = synthesize_condition(cond_expr, jira, mod, cfg, nn,

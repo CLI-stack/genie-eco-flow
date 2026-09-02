@@ -326,16 +326,16 @@ def main():
     # Build scope → module_name map from PostEco for module resolution
     scope_to_mod = build_scope_to_module_map(posteco)
 
-    # Find the tile-root module name (for entries with empty instance_scope)
-    # Tile-root module follows pattern: ddrss_<tile>_t_<tile> (or with _0 suffix in Route)
+    # Find the tile-root module name (for entries with empty instance_scope).
+    # Tile-root module is the tile wrapper <project>_<tile>_t (or _0 suffix in Route);
+    # it ends in "_<tile>_t" and has NO submodule suffix after _t. Project-agnostic:
+    # match any leading <project>_ prefix (ddrss_, gmc_, ...) via [A-Za-z0-9_]*.
     tile_root_module = ''
     if args.tile:
-        # Tile-root module is ddrss_<tile>_t (or ddrss_<tile>_t_0 in Route)
-        # It does NOT have a submodule suffix after _t
-        for pat in [f'ddrss_{args.tile}_t ', f'ddrss_{args.tile}_t_0 ']:
+        for pat in [f'[A-Za-z0-9_]*{args.tile}_t ', f'[A-Za-z0-9_]*{args.tile}_t_0 ']:
             try:
                 proc = subprocess.run(
-                    f'zcat {posteco} | grep -m1 "^module {pat}" | awk \'{{print $2}}\'',
+                    f'zcat {posteco} | grep -m1 -E "^module {pat}" | awk \'{{print $2}}\'',
                     shell=True, capture_output=True, text=True, timeout=60
                 )
                 candidate = proc.stdout.strip().rstrip('(').rstrip()

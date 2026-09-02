@@ -94,7 +94,7 @@ def _discover_dff_cell_type(host_module, dff_clock, preeco_synth_v, ref_dir, til
     `<tile_module>_<host_module>` prefix variant.
     """
     candidates = [host_module]
-    if host_module and not host_module.startswith('ddrss_'):
+    if host_module and not re.match(r'^\w+?_t_', host_module):
         candidates.append(f'{tile_module}_{host_module}')
     candidates.extend([f'{c}_0' for c in list(candidates)])
     # Build the source: prefer cached file, else gz. Use zcat for .gz paths
@@ -508,7 +508,7 @@ def main():
     # Extract key fields
     target_reg  = rtl_change.get('target_register') or rtl_change.get('new_token', '')
     host_module = (rtl_change.get('declaring_module') or rtl_change.get('module_name', ''))
-    if not host_module.startswith('ddrss_') and host_module:
+    if not re.match(r'^\w+?_t_', host_module) and host_module:
         # Heuristic: prepend tile prefix if missing — but guard against
         # double-prepend when the caller passes a tile_module that already
         # contains host_module (e.g. tile_module='ddrss_umccmd_t_umccmd'
@@ -640,10 +640,12 @@ def main():
     # usually just the module scope without tile prefix ('WDB').  Extract the
     # tile name from tile_module (e.g. 'ddrss_umcdat_t' → 'umcdat') and prepend
     # it to each scope candidate so both 'WDB/sig' and 'umcdat/WDB/sig' are tried.
-    # Extract tile scope from tile_module: 'ddrss_umcdat_t' → 'umcdat'
-    # Use re.sub to strip the trailing _t suffix as a substring (not rstrip which
-    # strips individual characters and would incorrectly strip 'umcda' from 'umcdat')
-    _tile_scope = re.sub(r'^ddrss_', '', args.tile_module or '')
+    # Extract tile scope from tile_module: 'ddrss_umcdat_t' → 'umcdat',
+    # 'gmc_gmcch_0_t' → 'gmcch_0'. Strip the leading <project>_ segment (first
+    # underscore-delimited token) and the trailing _t suffix — project-agnostic.
+    # Use re.sub for _t$ (not rstrip, which strips individual chars and would
+    # incorrectly turn 'umcdat' into 'umcda').
+    _tile_scope = re.sub(r'^\w+?_', '', args.tile_module or '')
     _tile_scope = re.sub(r'_t$', '', _tile_scope)
     _scope_candidates_extended = list(dict.fromkeys(
         _scope_candidates +
