@@ -600,13 +600,27 @@ def emit(rtl_diff, study, jira, ref_dir=None, rename_map=None):
         return f"n_eco_{jira}_pf_{tag}_{seq[0]}"
     cfg = RtlConfig(ref_dir) if (ref_dir and RtlConfig) else None
     _body_cache = {}
+    # Nets this SAME ECO introduces (a new flop's Q, a threaded new port). A
+    # priority_force condition may legitimately reference one of these — it does NOT
+    # exist in PreEco yet but WILL exist post-apply (the sibling new_logic_dff /
+    # new_port changes create + thread it). Treat them as grounded so the condition
+    # synthesizes instead of fail-closing on a leaf the ECO itself provides.
+    _eco_new_nets = set()
+    for _c in rtl_diff.get('changes', []):
+        if _c.get('change_type') in ('new_logic_dff', 'new_logic', 'new_logic_gate', 'new_port',
+                                     'port_declaration', 'port_connection'):
+            for _k in ('new_token', 'target_register'):
+                _v = _c.get(_k)
+                if _v:
+                    _eco_new_nets.add(str(_v))
     def _in_netlist_pred(module):
         if not ref_dir:
             return (lambda s: True)
         if module not in _body_cache:
             _body_cache[module] = _module_netlist_body(ref_dir, module)
         txt = _body_cache[module]
-        return (lambda s: bool(re.search(r'\b' + re.escape(s) + r'\b', txt)))
+        return (lambda s: s in _eco_new_nets
+                          or bool(re.search(r'\b' + re.escape(s) + r'\b', txt)))
     added, errs = 0, []
     for c in rtl_diff.get('changes', []):
         if c.get('change_type') != 'priority_force':
