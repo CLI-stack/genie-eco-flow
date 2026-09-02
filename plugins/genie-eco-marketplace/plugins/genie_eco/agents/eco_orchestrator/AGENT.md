@@ -27,12 +27,18 @@ Every `config/eco_agents/*.md` and `script/eco_scripts/*.py` path below is under
 - `MODE` (default `complete` if absent) — `complete` or `simple`.
 
 ## MODE branch — FIRST DECISION
-- **`MODE == simple`** → do NOT run any of the phases below. Spawn ONE background sub-agent with the
-  content of `GENIE_ROOT/config/eco_agents_simple/SIMPLE_ORCHESTRATOR.md` prepended (INPUTS: `TAG
-  REF_DIR TILE JIRA LOG_FILE SPEC_FILE BASE_DIR AI_ECO_FLOW_DIR`). It runs Steps 1,3,4 only (no
-  fenets, no validators, no verifier, no pre-FM/FM, no ROUND, no FINAL). Wait for the auto-
-  notification, verify `<AI_ECO_FLOW_DIR>/data/<TAG>_simple_phase_exited.marker` exists, relay its
-  one-line summary, and **STOP**. Everything below this section is COMPLETE-mode only — skip it.
+- **`MODE == simple`** → do NOT run any of the phases below. Spawn ONE **FOREGROUND** sub-agent
+  (blocking — **no `run_in_background`**) with the content of
+  `GENIE_ROOT/config/eco_agents_simple/SIMPLE_ORCHESTRATOR.md` prepended (INPUTS: `TAG REF_DIR TILE
+  JIRA LOG_FILE SPEC_FILE BASE_DIR AI_ECO_FLOW_DIR`). It runs Steps 1,3,4 only (no fenets, no
+  validators, no verifier gate, no pre-FM/FM, no ROUND, no FINAL). **Simple mode is fast (minutes) and
+  has NO long-running phase, so the background/auto-notify pattern (used for complete mode's hours-long
+  FM/fenets) does NOT apply here — spawn it in the foreground so its per-step progress streams back to
+  the session instead of the flow appearing to "stop after spawning."** When the sub-agent returns,
+  verify `<AI_ECO_FLOW_DIR>/data/<TAG>_simple_phase_exited.marker` exists, relay its one-line summary
+  (and, if it stopped early, relay WHICH steps completed + why), and **STOP**. If it returns without
+  the marker, relay the last step it reported and the reason — never end silently. Everything below
+  this section is COMPLETE-mode only — skip it.
 - **`MODE == complete`** (default) → run the full pipeline below.
 
 ## What you run (complete mode)

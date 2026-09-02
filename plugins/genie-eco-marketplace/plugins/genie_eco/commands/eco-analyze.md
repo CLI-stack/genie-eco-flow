@@ -133,6 +133,13 @@ command + orchestrator. If the repo ever moves, update this one path here and in
    on MODE: `complete` runs the full STUDY -> APPLY -> ROUND -> FINAL state machine with all hard
    gates; `simple` runs only Steps 1,3,4 (via `config/eco_agents_simple/`) and stops. Do NOT run
    the phases yourself.
+   - **For `simple` mode, spawn `eco_orchestrator` in the FOREGROUND (blocking — no
+     `run_in_background`).** Simple mode is fast (minutes) with no long-running FM/fenets phase, so
+     running it foreground streams its per-step progress ("Step 1 OK …", "Step 3a OK …") straight to
+     the session. The background/auto-notify pattern is for `complete` mode only; using it for simple
+     mode is what makes the flow look like it "spawned an agent and stopped" without any update.
+   - **For `complete` mode, spawn in the background** per the phase pattern (STUDY/APPLY/ROUND own
+     their hours-long internal polling).
 
 3b. **(simple + direct-input style only) Write the patched netlists back in place.** After the
    orchestrator finishes, the patched netlists are in `<SHIM_REF_DIR>/data/PostEco/<Stage>.v.gz` for
