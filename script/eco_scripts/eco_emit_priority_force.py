@@ -733,7 +733,18 @@ def emit(rtl_diff, study, jira, ref_dir=None, rename_map=None):
                 old = bspec.get('old_net')
                 dff_cell = bspec.get('dff_cell'); dff_pin = bspec.get('dff_pin', 'D')
                 if b is None:
-                    continue
+                    # Scalar register (e.g. `reg BlockScrubReq;`): the RTL diff carries a
+                    # single bits[] entry with bit=null (no index). Treat it as bit 0 so
+                    # the force-mux + D-pin rewire ARE emitted. Skipping it (the old
+                    # behaviour) silently dropped the entire force → the ECO's intent
+                    # (force sig=CONST under the new condition) was never implemented, and
+                    # with no FM in simple mode nothing would catch the missing logic.
+                    if is_bus:
+                        errs.append(f"priority_force {mod}: forced BUS signal {sig!r} has a "
+                                    f"bits[] entry with a null bit index — cannot place the bus "
+                                    f"force. Give an explicit bit index in the RTL diff.")
+                        continue
+                    b = 0   # scalar: single-bit force, net name is `sig` (no [bit])
                 cval = cbits[len(cbits) - 1 - b] if b < len(cbits) else '0'
                 net = f'{sig}[{b}]' if is_bus else sig     # the forced net's own name
                 drv = dmap.get(net)
