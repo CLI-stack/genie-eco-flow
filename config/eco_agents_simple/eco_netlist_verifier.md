@@ -98,9 +98,22 @@ it is absent by design, not unresolved, and must NOT stop the flow.
    entry is *genuinely* unresolvable or ambiguous. See `SIMPLE_ORCHESTRATOR.md` Correctness-posture
    Rule 4.
 
+6. **Check 4 (wire decl) — a new bus net is an INTERNAL wire in the module that CREATES it, even if
+   it is a PORT of a child.** For every `new_logic_gate` whose `output_net` is a **bus bit** `X[N]`,
+   set **`needs_explicit_wire_decl = True`** on the entry UNLESS `X` is a declared **port of that
+   gate's OWN module** (`module_name`). Do NOT clear the flag just because `X` has a `port_declaration`
+   — that declaration is in the *child* module that consumes `X`; in the parent module where the ECO
+   gates DRIVE `X`, `X` is a new internal bus and needs its own `wire [MSB:0] X ;`. 10036 hit this:
+   the 8 INV gates drive `RowUpperMask[0..7]` in `ddrss_umccmd_t_umccmd` but the flag was left False
+   (because `RowUpperMask` is an `input` port of the child `umcaddr`/`umcaddr_mod`), so no
+   `wire [7:0] RowUpperMask` was emitted in `umccmd` → `RowUpperMask[N]` indexed an implicit scalar →
+   SVR-14 / FM-599. Rule of thumb: `output_net` is `X[N]` **and** there is no `port_declaration` with
+   `signal_name==X` **and** `module_name==<this gate's module_name>` → `needs_explicit_wire_decl=True`.
+
 ## Keep unchanged (pure structural — apply exactly as the complete verifier)
 Check 1 (GAP-15 and_term strategy, from `<TAG>_eco_and_term_port_check.json`), Check 4 (GAP-14 wire
-decl), Check 5/6 (Mode-H seed + cascade DFFs), Check 7 (port boundary → auto `port_declaration`),
+decl — **but see substitution #6: a new bus-bit gate output needs an explicit `wire [MSB:0]` in its
+own module even when it is a child's port**), Check 5/6 (Mode-H seed + cascade DFFs), Check 7 (port boundary → auto `port_declaration`),
 Check 8 (consumer cascade → auto `rewire`), Check 9 (UNCONNECTED bus bit — **but see substitution #4
 above: any UNCONNECTED tap feeding an ECO gate MUST go through `eco_modei_chain_input_check.py`; the
 shallow rename alone leaves a wrapper-undriven bit**), Check 11 (needs_named_wire),
