@@ -261,6 +261,18 @@ def main():
             sig = e.get('signal_name') or e.get('new_token') or ''
             if sig:
                 new_port_nets.add(sig)
+        # Also include nets created/bridged by port_connection entries (Pass 3) in this
+        # same round — e.g. a Mode-I bridge whose companion new_logic_gate (Pass 1) reads
+        # the net that Pass 3 will connect. Pass 3 always runs after Pass 1 mechanically,
+        # but the net is a valid forward reference within the same round — do not SKIP it.
+        if e.get('change_type') == 'port_connection':
+            for key in ('net_name', 'net_name_after'):
+                pc_net = e.get(key, '')
+                if pc_net and isinstance(pc_net, str):
+                    new_port_nets.add(pc_net)
+                    flat_pc_net = re.sub(r'\[(\d+)\]', lambda m: f'_{m.group(1)}_', pc_net)
+                    if flat_pc_net != pc_net:
+                        new_port_nets.add(flat_pc_net)
         # Also include output nets of gates that will be inserted by this same Perl batch
         if e.get('change_type') in ('new_logic_gate', 'new_logic_dff', 'new_logic'):
             out = e.get('output_net', '')
