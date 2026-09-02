@@ -60,11 +60,41 @@ it is absent by design, not unresolved, and must NOT stop the flow.
 3. **Check 12 (PENDING cleanup):** there is no FM rerun in simple mode. Resolve every
    `PENDING_FM_RESOLUTION:*` structurally (ladder above) or mark `UNRESOLVABLE:*` and flag — never
    leave it, never substitute `1'b0`.
+4. **Check 9 recursive-undriven (Mode-I) — MANDATORY, deterministic, NEVER assert "driven" by eye.**
+   When an ECO gate/leaf taps a **bus bit that is `UNCONNECTED_*` at a child instance's port** (the
+   classic case: a spare CSR read-back bit like `REG_UmcCfgEco[N]`), renaming the parent's UNCONNECTED
+   slot to a named net is **NOT enough** — the bit is often *also* UNCONNECTED one level deeper (the
+   real DFF `Q` is discarded to `UNCONNECTED_*` inside the wrapper), so the named net ends up
+   **undriven** and the whole cone reads garbage. This is exactly what a wrong "the bit is genuinely
+   driven inside <inst>" hand-judgement missed (10036: 8 `REG_UmcCfgEco` taps left undriven → 8 broken
+   and-terms). **Do not decide this by reading the netlist yourself.** For EVERY such tap run the same
+   deterministic complete-mode detector the DFF path uses:
+   ```bash
+   python3 script/eco_scripts/eco_modei_chain_input_check.py \
+       --ref-dir <REF_DIR> --host-module <parent module, e.g. ddrss_umccmd_t_umccmd> \
+       --chain-input '<bus>[<bit>]'   # e.g. 'REG_UmcCfgEco[4]'
+   ```
+   - Feed it one `<bus>[<bit>]` per UNCONNECTED-renamed tap in the study (the `port_name` +
+     `net_name` = `<bus>_<bit>_` on each such `port_connection` entry give you the bus and bit; the
+     entry's `module_name` is the `--host-module`).
+   - **`status == "MODEI_DETECTED"`** → the bit is undriven through the wrapper. Splice **BOTH**
+     emitted entries into the study verbatim (all present stages): `suggested_unconnected_rewires_entry`
+     **and** `suggested_child_port_connection_entry` (the latter wires the inner sub-instance's real
+     `Q` bit up to the wrapper's own output port — the leg that makes the tap actually driven). Skip if
+     an equivalent child `port_connection` (same `instance_name` + `child_module_name` + `bus_bit_index`)
+     is already present.
+   - **`status != "MODEI_DETECTED"`** (script finds the bit already driven) → the shallow rename is
+     correct; leave it. Either way the *script* decides, not you.
+   Run this before Check 10 (cone verification) so the freshly-threaded net is in place when cones are
+   re-checked. It is the same `eco_modei_chain_input_check.py` complete mode runs — simple mode was
+   simply not invoking it for and_term/gate-input leaves.
 
 ## Keep unchanged (pure structural — apply exactly as the complete verifier)
 Check 1 (GAP-15 and_term strategy, from `<TAG>_eco_and_term_port_check.json`), Check 4 (GAP-14 wire
 decl), Check 5/6 (Mode-H seed + cascade DFFs), Check 7 (port boundary → auto `port_declaration`),
-Check 8 (consumer cascade → auto `rewire`), Check 9 (UNCONNECTED bus bit), Check 11 (needs_named_wire),
+Check 8 (consumer cascade → auto `rewire`), Check 9 (UNCONNECTED bus bit — **but see substitution #4
+above: any UNCONNECTED tap feeding an ECO gate MUST go through `eco_modei_chain_input_check.py`; the
+shallow rename alone leaves a wrapper-undriven bit**), Check 11 (needs_named_wire),
 Check 13 (real-net preference), Check 10 (cone verification — use `eco_cone_trace.py cone` to confirm
 each entry's cone leaves resolve per stage), Check 14 (A/B decompose fallback).
 
