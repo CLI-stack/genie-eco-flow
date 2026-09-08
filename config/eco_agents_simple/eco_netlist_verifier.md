@@ -112,15 +112,38 @@ it is absent by design, not unresolved, and must NOT stop the flow.
 
 7. **Check 59 (Synchronous Reset Verification & Auto-Fix on Register D-inputs).**
    Whenever a register's D-input or `wire_swap` / `enable_swap` is modified, verify whether the
-   target register in RTL has synchronous reset (`if (IReset) reg <= 0;` or `if (!IReset) ...` in an
-   `always @(posedge)` block on a flop without async reset pin):
+   target register in RTL has synchronous reset (`if (reset_signal) reg <= 0;` or `if (!reset_signal) ...` in an
+   `always @(posedge)` block on a flop without a hardware async reset pin):
    - Check if the study contains:
-     1. A shared inverter gate `INVD1(reset_signal) -> n_eco_<jira>_ireset_inv` (e.g. `eco_<jira>_ireset_inv`)
-     2. Per-bit AND gates `AN2D1(A1=n_eco_<jira>_ireset_inv, A2=<mux_out>, Z=n_eco_<jira>_nxtd_<bit>)`
-     3. The DFF D-pin rewires or study connections connect to the `AN2D1` output `Z`, NOT to the MUX output.
+     1. A shared inverter gate `INVD1(reset_signal) -> n_eco_<jira>_ireset_inv`
+     2. Per-bit AND gates `AN2D1(A1=n_eco_<jira>_ireset_inv, A2=<d_expr_net>, Z=n_eco_<jira>_nxtd_<bit>)`
+     3. The DFF D-pin rewires or study connections connect to the `AN2D1` output `Z`, NOT directly to the MUX output.
    - **If missing:** auto-insert the shared `INVD1` and the per-bit `AN2D1` gates into the study for all
      present stages, and rewire the DFF D-pins to the `AN2D1` output nets. Never leave a synchronously
      reset register connected directly to a MUX output without its reset gate.
+
+8. **Check 60 (iQ/oQ Companion Port Connection Rule for Internal CSR Regs).**
+   When an `oQ_*` port connection is added to expose a previously unused/unconnected internal register bit
+   on a register wrapper block:
+   - Check if the underlying register module has internal instances that consume or drive this bit
+     (e.g. an internal readback mux with `iQ_*` port and an internal register array with `oQ_*` port).
+   - If they exist and were connected to an unconnected placeholder (e.g. `*_0`), **MANDATORY**: emit companion
+     `port_connection` entries for those internal instances to wire them to the active register signal.
+   - **Omitting this leaves the internal signal undriven inside the register module, evaluating to X and causing DFF0X failures in Formality.**
+
+9. **Check 61 (Register Output Pin Anchor / MB Flop Q-Net Resolution in Physical Stages).**
+   When resolving an input signal that is driven by an existing register Q output:
+   - In PrePlace and Route, P&R often merges individual registers into Multi-Bit (MB) cells or inserts DFT scan wrappers,
+     renaming the output net from the logical RTL name to an instance-local output net (e.g. a `test_so*` scan net or an MB `.Q[N]` net).
+   - **Rule**: Search PrePlace/Route netlists for the source register instance and identify its actual physical `.Q` / `.QN` / `.Q[N]`
+     output pin connection. Use that physical output net name directly in PrePlace/Route gate inputs, rather than assuming
+     the unmapped RTL wire name exists.
+
+10. **Check 62 (Gated Clock Assignment by Enable Condition).**
+   When assembling a new gated register (`new_logic_dff` with `enable_condition: <expr>`):
+   - Search the PreEco netlist for an existing clock-gate cell (`CKOR*`, `ICG*`, `CTG*`) whose enable pin `.E(...)` is driven
+     by the matching enable signal.
+   - Match by the **enable condition net**, rather than by register name string prefix.
 
 ## Keep unchanged (pure structural — apply exactly as the complete verifier)
 Check 1 (GAP-15 and_term strategy, from `<TAG>_eco_and_term_port_check.json`), Check 4 (GAP-14 wire

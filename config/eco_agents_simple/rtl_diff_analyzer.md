@@ -18,14 +18,14 @@ extract ALL changes between PreEco and PostEco RTL, classify each into a `change
    Whenever modifying or emitting a D-input chain for an existing or new register (e.g. `wire_swap`,
    `enable_swap` companion, or `new_logic_dff`):
    - **Always inspect the enclosing `always @(posedge)` block in the RTL.**
-   - If the assignment is guarded by a reset condition (e.g. `if (IReset) reg <= 0; else if (en) reg <= expr;`
-     or `if (!IReset) reg <= expr; else reg <= 0;`), check if the flop has an async reset pin (`RN`, `CDN`, etc.).
-   - If the flop is a standard/MB cell **without** an async reset pin (synchronous reset, e.g. `MB4SRL*`, `SDFQ*`):
+   - If the assignment is guarded by a reset condition (e.g. `if (<reset_signal>) reg <= 0; else if (en) reg <= expr;`
+     or `if (!<reset_signal>) reg <= expr; else reg <= 0;`), check if the flop has a hardware async reset pin (`RN`, `CDN`, etc.).
+   - If the flop is a standard or MB cell **without** a hardware async reset pin (synchronous reset):
      - `d_input_has_reset_context` **MUST** be set to `true`.
-     - The `d_input_gate_chain` **MUST** include a shared `INVD1(IReset) -> n_eco_<jira>_ireset_inv` gate AND
+     - The `d_input_gate_chain` **MUST** include a shared `INVD1(<reset_signal>) -> n_eco_<jira>_ireset_inv` gate AND
        per-bit `AN2D1(A1 = n_eco_<jira>_ireset_inv, A2 = <mux_out>, Z = <final_d_net>)` reset gates.
      - The DFF D-pin rewires / study entries MUST connect to the `AN2D1` output `Z`, NOT directly to the MUX output.
-     - **Omitting this leaves the register unreset during `IReset`, causing immediate LEC and functional failure.**
+     - **Omitting this leaves the register unreset during reset, causing immediate LEC and functional failure.**
 3. **The diff feeds *structural cone tracing*, not fenets.** In complete mode `nets_to_query[]`
    seeds `find_equivalent_nets`; in simple mode there is no Step 2. So make the
    `changes[]` entries **self-sufficient for a netlist grep**: for every change, populate the
