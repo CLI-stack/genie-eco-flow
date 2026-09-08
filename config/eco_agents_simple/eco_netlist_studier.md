@@ -105,13 +105,15 @@ python3 script/eco_scripts/eco_emit_dff_entry.py \
     --tag <TAG> --jira <JIRA> --tile-module <tile_module_per_stage> \
     --base-dir <AI_ECO_FLOW_DIR> --output <AI_ECO_FLOW_DIR>/data/<TAG>_eco_dff_entry_<TARGET_REG>.json
 ```
-With the empty map, `resolve_cp_per_stage` falls back to the **bare clock name** (`dff_clock` from
-the RTL diff) in all three stages — correct because clock nets are global and survive P&R renaming —
-and `resolve_neighbor_dff_si_se` greps a neighbour DFF in the host module for per-stage SI/SE. Splice
-the wrapper's per-stage output verbatim into `study[stage]` exactly as complete mode does. **Then
-verify the CP structurally**: confirm the bare-clock net resolves in EACH stage
-(`eco_cone_trace.py resolve --signal <dff_clock>`); if a stage cannot resolve it, mark that entry
-`NET-ABSENT-IN-STAGE` — do NOT guess a clock. Scan stitching stays out of scope (`SE=SI=1'b0`), same
+`resolve_cp_per_stage` automatically uses the **register-instance neighbour anchor** (finding a same-domain DFF
+in the host module) to assign the region-correct clock in PrePlace and Route (e.g. post-CTS clock leaf), falling
+back to bare clock only if verified. Scan stitching stays `SE=SI=1'b0`.
+
+## Internal Register / CSR Port Connections (Check 60)
+When wiring a previously unconnected output pin on an internal register wrapper (e.g. `.oQ_<name>`):
+- Check if the underlying register module has internal instances with `iQ_<name>` (readback mux) and `oQ_<name>` (register array).
+- If so, emit companion `port_connection` entries for both internal instances to wire them to the active register signal,
+  preventing undriven `X` in Formality.
 as complete mode.
 
 ## Correctness (no FM safety net)
