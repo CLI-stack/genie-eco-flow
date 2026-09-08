@@ -128,7 +128,23 @@ it is absent by design, not unresolved, and must NOT stop the flow.
    - Check if the underlying register module has internal instances that consume or drive this bit
      (e.g. an internal readback mux with `iQ_*` port and an internal register array with `oQ_*` port).
    - If they exist and were connected to an unconnected placeholder (e.g. `*_0`), **MANDATORY**: emit companion
-     `port_connection` entries for those internal instances to wire them to the active register signal.
+     `port_connection` entries (NEVER `change_type: "rewire"`) for those internal instances to wire them to the active register signal.
+   - **Companion entry schema**:
+     ```json
+     {
+       "change_type": "port_connection",
+       "module_name": "<parent_wrapper_module>",
+       "instance_name": "<child_internal_instance>",
+       "child_module_name": "<child_internal_module>",
+       "port_name": "<iQ_or_oQ_port_name>",
+       "net_name": "<active_signal_net>",
+       "net_name_before": {
+         "Synthesize": "<placeholder_net_e.g._0>",
+         "PrePlace": "<placeholder_net_e.g._0>",
+         "Route": "<placeholder_net_e.g._0>"
+       }
+     }
+     ```
    - **Omitting this leaves the internal signal undriven inside the register module, evaluating to X and causing DFF0X failures in Formality.**
 
 9. **Check 61 (Register Output Pin Anchor / MB Flop Q-Net Resolution in Physical Stages).**
@@ -144,6 +160,13 @@ it is absent by design, not unresolved, and must NOT stop the flow.
    - Search the PreEco netlist for an existing clock-gate cell (`CKOR*`, `ICG*`, `CTG*`) whose enable pin `.E(...)` is driven
      by the matching enable signal.
    - Match by the **enable condition net**, rather than by register name string prefix.
+
+11. **Check 63 (Mandatory Scalar Net Naming — No Bracketed Bus Indices in Netlists).**
+   - In gate-level netlists (Synthesize, PrePlace, Route), **ALL generated ECO nets MUST use 1-bit scalar names**
+     (e.g. `n_eco_<jira>_nxtd_<bit>_`, `n_eco_<jira>_gate_<bit>_`).
+   - **NEVER use bracketed vector syntax** like `net_name[0]` or `wire [N:0]` in study JSON or rewires.
+   - **Why:** Referencing `net[0]` before its vector declaration causes Verilog to implicitly treat `net` as a 1-bit scalar,
+     causing Formality LEC `read_verilog` to crash with `Error: Indexing into non-array '...' is not allowed (FM-599)`.
 
 ## Keep unchanged (pure structural — apply exactly as the complete verifier)
 Check 1 (GAP-15 and_term strategy, from `<TAG>_eco_and_term_port_check.json`), Check 4 (GAP-14 wire

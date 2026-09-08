@@ -112,9 +112,28 @@ back to bare clock only if verified. Scan stitching stays `SE=SI=1'b0`.
 ## Internal Register / CSR Port Connections (Check 60)
 When wiring a previously unconnected output pin on an internal register wrapper (e.g. `.oQ_<name>`):
 - Check if the underlying register module has internal instances with `iQ_<name>` (readback mux) and `oQ_<name>` (register array).
-- If so, emit companion `port_connection` entries for both internal instances to wire them to the active register signal,
+- If so, emit companion `port_connection` entries (NEVER `change_type: "rewire"`) for both internal instances to wire them to the active register signal,
   preventing undriven `X` in Formality.
-as complete mode.
+- **Companion entry schema**:
+  ```json
+  {
+    "change_type": "port_connection",
+    "module_name": "<parent_wrapper_module>",
+    "instance_name": "<child_internal_instance>",
+    "child_module_name": "<child_internal_module>",
+    "port_name": "<iQ_or_oQ_port_name>",
+    "net_name": "<active_signal_net>",
+    "net_name_before": {
+      "Synthesize": "<placeholder_net_e.g._0>",
+      "PrePlace": "<placeholder_net_e.g._0>",
+      "Route": "<placeholder_net_e.g._0>"
+    }
+  }
+  ```
+
+## Mandatory Scalar Net Naming (Check 63)
+- In gate-level netlists (Synthesize, PrePlace, Route), **ALL generated ECO nets MUST be 1-bit scalar net names** (e.g. `n_eco_<jira>_nxtd_<bit>_`, `n_eco_<jira>_<name>_<bit>_`).
+- **NEVER use bracketed vector syntax** like `net_name[0]` in study JSON or rewires. Referencing undeclared vector nets causes Verilog to infer 1-bit scalar nets, making Formality LEC fail on `read_verilog` with `FM-599`.
 
 ## Correctness (no FM safety net)
 - **Cell types: copy from PreEco.** Grep the PreEco netlist for the needed function/family and copy
