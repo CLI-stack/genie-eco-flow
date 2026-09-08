@@ -1652,13 +1652,21 @@ class GenieCLI:
 
         # Standalone ECO — route the ECO ENTRY task's launch bookkeeping (runs/<tag>.csh,
         # log, data/<tag>_{spec,pid,metadata,debug,analyze}) into the tile's AI_ECO_FLOW_<tag>
-        # so NOTHING lands in <repo>/users/$USER/data. The FM sub-launches (find_equivalent_nets,
-        # post_eco_formality) already set ECO_OUT_DIR via the orchestrator MDs; this covers the
-        # analyze entry, where ECO_OUT_DIR is not yet known (the TAG is generated here).
+        # (or AI_ECO_FLOW_SIMPLE_<tag> for simple mode) so NOTHING lands in <repo>/users/$USER/data.
+        # The FM sub-launches (find_equivalent_nets, post_eco_formality) already set ECO_OUT_DIR
+        # via the orchestrator MDs; this covers the analyze entry, where ECO_OUT_DIR is not yet
+        # known (the TAG is generated here).
         if not os.environ.get('ECO_OUT_DIR', '').strip() and 'eco_analyze' in (script or '').lower():
             _rd = str(arguementInfo.get('refDir', '')).replace('refDir:', '').strip(':').strip()
             if _rd and _rd != 'refDir' and os.path.isdir(_rd):
-                self.base_dir = os.path.join(_rd, f'AI_ECO_FLOW_{tag}')
+                _mode = os.environ.get('ECO_MODE', '').strip().lower()
+                if not _mode:
+                    if 'simple' in instruction_text.lower().split():
+                        _mode = 'simple'
+                    else:
+                        _mode = 'complete'
+                flow_prefix = 'AI_ECO_FLOW_SIMPLE_' if _mode == 'simple' else 'AI_ECO_FLOW_'
+                self.base_dir = os.path.join(_rd, f'{flow_prefix}{tag}')
                 os.makedirs(os.path.join(self.base_dir, 'data'), exist_ok=True)
                 os.makedirs(os.path.join(self.base_dir, 'runs'), exist_ok=True)
 

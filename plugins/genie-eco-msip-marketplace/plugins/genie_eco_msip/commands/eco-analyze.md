@@ -136,13 +136,14 @@ All four inputs are **REQUIRED** — there are no defaults, including `mode`.
 2. **Run the analyze validator** from the shared repo root (`GENIE_ROOT`):
    ```bash
    cd /home/abinbaba/eco_flow
-   python3 script/genie_cli.py -i "analyze eco at <ref_dir> for <tile> <jira>" --execute
+   ECO_MODE=<mode> python3 script/genie_cli.py -i "analyze eco at <ref_dir> for <tile> <jira>" --execute
    ```
    This runs `eco_analyze.csh`, which validates the PreEco/PostEco netlists + RTL dirs and
    emits an `ECO_ANALYZE_MODE_ENABLED` block (with `TAG REF_DIR TILE JIRA LOG_FILE SPEC_FILE`).
+   Simple mode creates `<ref_dir>/AI_ECO_FLOW_SIMPLE_<TAG>/`; complete mode creates `<ref_dir>/AI_ECO_FLOW_<TAG>/`.
 
    **Multi-user note — do NOT cd into `users/$USER`.** The standalone flow writes **all** output
-   into `<ref_dir>/AI_ECO_FLOW_<TAG>/` (writable by whoever owns the run), and only **reads** the
+   into the tile's `AI_ECO_FLOW_[SIMPLE_]<TAG>/` directory (writable by whoever owns the run), and only **reads** the
    shared config CSVs from `GENIE_ROOT` (world-readable). Running from `GENIE_ROOT` therefore needs
    **no per-user workspace and no write access to the repo** — any teammate can run it read-only, and
    notifications default to `$USER@amd.com`. (The old genie_agent "always run from `users/$USER`" rule

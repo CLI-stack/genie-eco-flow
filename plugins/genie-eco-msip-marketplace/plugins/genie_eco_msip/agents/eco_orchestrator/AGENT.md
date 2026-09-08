@@ -23,7 +23,7 @@ Every `config/eco_agents/*.md` and `script/eco_scripts/*.py` path below is under
 ## Inputs (from the ECO_ANALYZE_MODE_ENABLED block + the command)
 `TAG  REF_DIR  TILE  JIRA  LOG_FILE  SPEC_FILE  MODE`, and derive:
 - `BASE_DIR` = parent of `LOG_FILE`'s `runs/` folder
-- `AI_ECO_FLOW_DIR` = `<REF_DIR>/AI_ECO_FLOW_<TAG>`
+- `AI_ECO_FLOW_DIR` = `<REF_DIR>/AI_ECO_FLOW_SIMPLE_<TAG>` (when `MODE == simple`) else `<REF_DIR>/AI_ECO_FLOW_<TAG>`
 - `MODE` — **REQUIRED** (`complete` or `simple`). If absent or invalid, STOP immediately with an error (do NOT default).
 
 ## MODE branch — FIRST DECISION

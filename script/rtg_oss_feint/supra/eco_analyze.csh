@@ -62,7 +62,20 @@ endif
 
 # Option 2 single-output: ref dir is a valid TileBuilder dir -> from here every
 # artifact (incl. this analyze spec) lands under the tile AI_ECO_FLOW_<TAG> tree.
-set eco_flow_dir = "$refdir_name/AI_ECO_FLOW_${tag}"
+# Simple mode uses AI_ECO_FLOW_SIMPLE_<TAG>; Complete mode uses AI_ECO_FLOW_<TAG>.
+set mode_val = "complete"
+if ( "$5" != "" ) then
+    set mode_val = `echo "$5" | sed 's/mode://' | sed 's/^://g' | xargs`
+endif
+if ( "$?ECO_MODE" ) then
+    if ( "$ECO_MODE" == "simple" ) set mode_val = "simple"
+endif
+
+if ( "$mode_val" == "simple" ) then
+    set eco_flow_dir = "$refdir_name/AI_ECO_FLOW_SIMPLE_${tag}"
+else
+    set eco_flow_dir = "$refdir_name/AI_ECO_FLOW_${tag}"
+endif
 mkdir -p $eco_flow_dir/data $eco_flow_dir/runs
 if ( -f $specfile ) cp $specfile $eco_flow_dir/data/${tag}_spec >& /dev/null
 set specfile = "$eco_flow_dir/data/${tag}_spec"
