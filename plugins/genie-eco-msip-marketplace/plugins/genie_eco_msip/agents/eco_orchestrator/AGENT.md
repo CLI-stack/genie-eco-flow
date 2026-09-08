@@ -24,9 +24,12 @@ Every `config/eco_agents/*.md` and `script/eco_scripts/*.py` path below is under
 `TAG  REF_DIR  TILE  JIRA  LOG_FILE  SPEC_FILE  MODE`, and derive:
 - `BASE_DIR` = parent of `LOG_FILE`'s `runs/` folder
 - `AI_ECO_FLOW_DIR` = `<REF_DIR>/AI_ECO_FLOW_<TAG>`
-- `MODE` (default `complete` if absent) — `complete` or `simple`.
+- `MODE` — **REQUIRED** (`complete` or `simple`). If absent or invalid, STOP immediately with an error (do NOT default).
 
 ## MODE branch — FIRST DECISION
+Check `MODE` before doing anything else. If `MODE` is missing or not in `{complete, simple}`, **STOP immediately with an error**:
+`"ERROR: MODE is required and must be either 'complete' or 'simple'. Got: '<MODE>'. Aborting."`
+
 - **`MODE == simple`** → do NOT run any of the phases below. Spawn ONE **FOREGROUND** sub-agent
   (blocking — **no `run_in_background`**) with the content of
   `GENIE_ROOT/config/eco_agents_simple/SIMPLE_ORCHESTRATOR.md` prepended (INPUTS: `TAG REF_DIR TILE
@@ -39,7 +42,7 @@ Every `config/eco_agents/*.md` and `script/eco_scripts/*.py` path below is under
   (and, if it stopped early, relay WHICH steps completed + why), and **STOP**. If it returns without
   the marker, relay the last step it reported and the reason — never end silently. Everything below
   this section is COMPLETE-mode only — skip it.
-- **`MODE == complete`** (default) → run the full pipeline below.
+- **`MODE == complete`** → run the full pipeline below.
 
 ## What you run (complete mode)
 The full pipeline: **Phase A (STUDY) → Phase B (APPLY, Steps 4-6) → Phase C (ROUND

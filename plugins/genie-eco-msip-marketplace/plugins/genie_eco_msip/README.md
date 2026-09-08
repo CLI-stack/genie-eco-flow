@@ -1,4 +1,4 @@
-# genie_eco plugin
+# genie_eco_msip plugin
 
 Thin-launcher Claude Code plugin for the **Genie AI ECO flow** (STUDY → APPLY → ROUND → FINAL):
 RTL diff → per-stage gate-level ECO study → apply → Formality verification, with hard validator gates.
@@ -8,7 +8,7 @@ RTL diff → per-stage gate-level ECO study → apply → Formality verification
 |---|---|---|
 | Slash command | `commands/eco-analyze.md` | `/eco-analyze <ref_dir> <tile> <jira>` — validates inputs, emits the analyze signal, hands off to the orchestrator |
 | Orchestrator agent | `agents/eco_orchestrator/AGENT.md` | the phase state machine + hard gates (ported from the repo's `.claude/CLAUDE.md`) |
-| Skill | `skills/genie_eco/SKILL.md` | surfaces the flow in `/plugin`; defers to the command/agent |
+| Skill | `skills/genie_eco_msip/SKILL.md` | surfaces the flow in `/plugin`; defers to the command/agent |
 
 The plugin ships **only markdown**. All executable logic — 62 scripts (`script/eco_scripts/*.py`),
 13 sub-agent MDs (`config/eco_agents/*.md`), the FM/fenets `.csh`, and `genie_cli.py` — runs **in
@@ -28,8 +28,8 @@ update it in both places.
 
 ## Usage
 ```
-/plugin marketplace add /home/abinbaba/eco_flow/plugins/genie-eco-marketplace
-/plugin install genie_eco@genie-eco-marketplace
+/plugin marketplace add /home/abinbaba/eco_flow/plugins/genie-eco-msip-marketplace
+/plugin install genie_eco_msip@genie-eco-msip-marketplace
 /eco-analyze <ref_dir> umccmd 9899
 ```
 

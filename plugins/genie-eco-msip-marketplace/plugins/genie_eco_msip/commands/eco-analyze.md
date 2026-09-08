@@ -1,6 +1,6 @@
 ---
-description: Kick off the Genie AI ECO flow for an RTL change. Mode = complete (full STUDY->APPLY->ROUND->FINAL) or simple (steps 1,3,4 only).
-argument-hint: <ref_dir> <tile> <jira> [complete|simple]
+description: Kick off the Genie AI ECO flow for an RTL change. Prompts for mode (required - complete or simple), then ref_dir/RTL paths, jira and tile.
+argument-hint: [complete|simple] [<ref_dir> <jira> <tile>] — run bare to be prompted for each input
 ---
 
 # /eco-analyze — Genie AI ECO entry point
@@ -21,15 +21,19 @@ command + orchestrator. If the repo ever moves, update this one path here and in
 
 ## Arguments
 
-`$ARGUMENTS` = `<ref_dir> <tile> <jira> [mode]`
+`$ARGUMENTS` is **fully optional**. Anything not supplied is asked interactively (see step 1).
+All four inputs are **REQUIRED** — there are no defaults, including `mode`.
+
+- `mode` — **required**, `complete` or `simple`. Never assume a default; if the user did not
+  state it, ASK.
 - `ref_dir` — absolute path to the TileBuilder directory (must contain `revrc.main`).
-- `tile` — e.g. `umccmd`, `umcdat`, `ddrss_umc_t`.
+  In `simple` mode this may instead be direct RTL/netlist paths (see step 1a).
 - `jira` — the ECO ticket number, e.g. `9899`.
-- `mode` (optional, default `complete`) — one of:
+- `tile` — e.g. `umccmd`, `umcdat`, `ddrss_umc_t`.
 
 | mode | steps | pipeline |
 |---|---|---|
-| `complete` (default) | 1-6 | STUDY (1,2,3) → APPLY (4,5,6) → ROUND loop (on FM mismatch, max 10) → FINAL. Full fenets + validators + Formality. |
+| `complete` | 1-6 | STUDY (1,2,3) → APPLY (4,5,6) → ROUND loop (on FM mismatch, max 10) → FINAL. Full fenets + validators + Formality. |
 | `simple` | 1,3,4 | STUDY-lite (1 = RTL diff; **skip 2/fenets**, do structural cone tracing; 3 = study) → APPLY (4). **No** validators, verifier, pre-FM, FM, ROUND, FINAL, report, or email — the step-1/3/4 artifacts are the whole deliverable. |
 
 ## What to do
@@ -79,20 +83,38 @@ command + orchestrator. If the repo ever moves, update this one path here and in
    `bypassPermissions` disables all tool-permission prompts for this project directory; it is the
    intended posture for this autonomous flow, but state it plainly so the user knows.)
 
-1. **Parse & validate** `$ARGUMENTS` into `mode` (optional; default `complete`, else `complete`|`simple`)
-   and the inputs. Two input styles are accepted:
-   - **TileBuilder dir** (both modes): `<ref_dir> <tile> <jira>` where `ref_dir` is a directory with
-     `revrc.main`. This is the only style for `complete`.
-   - **direct inputs (explicit paths)** (`simple` mode ONLY): the user gives no TileBuilder dir but instead
-     the fields `RTL_BEFORE`, `RTL_AFTER` (each a `.v` file OR a directory), `NETLIST_SYNTH`
-     (**required**), `NETLIST_PREPLACE` and `NETLIST_ROUTE` (**optional** — omit for a Synthesize-only
-     run), plus `TILE` and `JIRA` (for net naming / reports). Accept them pasted in one message
-     (`RTL_BEFORE: … RTL_AFTER: … NETLIST_SYNTH: …`) and **ask only for missing REQUIRED fields**
-     (`RTL_BEFORE`, `RTL_AFTER`, `NETLIST_SYNTH`, `TILE`, `JIRA`). If the user gives only
-     `NETLIST_SYNTH`, proceed Synth-only — do NOT ask for PrePlace/Route. Then go to **step 1b**.
+1. **Collect the inputs — ASK, in this exact order.** First take whatever the user already gave
+   in `$ARGUMENTS` or in their message. For every input still missing, ask the user — one question
+   at a time, in this order, and do NOT proceed until each is answered. **Never invent a default;
+   `mode` in particular is REQUIRED, not optional.**
 
-   If `mode == complete` and no valid TileBuilder `ref_dir` is given, or any of `tile`/`jira` is
-   missing, stop with usage: `/genie_eco:eco-analyze <ref_dir> <tile> <jira> [complete|simple]`.
+   **Q1 — mode (always first).** Ask via `AskUserQuestion`:
+   - `complete` — full STUDY → APPLY → ROUND → FINAL, with fenets, all validators and Formality.
+     Requires a TileBuilder directory.
+   - `simple` — Steps 1, 3, 4 only. Fast, no Formality/rounds. Accepts either a TileBuilder
+     directory or direct RTL/netlist paths.
+
+   **Q2 — the design inputs (branches on the Q1 answer).**
+   - If `mode == complete`: ask for the **TileBuilder directory** (absolute path containing
+     `revrc.main`). This is the only accepted style for `complete` — there is no direct-path option.
+   - If `mode == simple`: ask which input style the user wants, then collect it:
+     - **TileBuilder directory** — an absolute path containing `revrc.main`; or
+     - **direct paths** — `RTL_BEFORE`, `RTL_AFTER` (each a `.v` file OR a directory) and
+       `NETLIST_SYNTH` (**required**), plus `NETLIST_PREPLACE` / `NETLIST_ROUTE` (**optional** —
+       omit for a Synthesize-only run). Accept them pasted in one message
+       (`RTL_BEFORE: … RTL_AFTER: … NETLIST_SYNTH: …`) and ask only for missing REQUIRED fields.
+       If the user gives only `NETLIST_SYNTH`, proceed Synth-only — do NOT ask for PrePlace/Route.
+       This style routes through **step 1b**.
+
+   **Q3 — jira.** The ECO ticket number, e.g. `9899`.
+
+   **Q4 — tile.** e.g. `umccmd`, `umcdat`, `ddrss_umc_t`.
+
+   **Validate** before continuing: `mode ∈ {complete, simple}`; a TileBuilder `ref_dir` actually
+   contains `revrc.main` (or, for simple + direct paths, the required RTL/netlist paths exist);
+   `jira` and `tile` are non-empty. If a supplied value fails validation, re-ask that one question
+   rather than stopping. Only stop with usage if the user declines to answer:
+   `/genie_eco_msip:eco-analyze <complete|simple> <ref_dir> <jira> <tile>`.
 
 1b. **(simple + direct-input style only) Build a shim ref_dir.** Turn the explicit paths into the
    TileBuilder layout the flow expects, so the whole simple flow runs unchanged. Generate a `<TAG>`
@@ -163,6 +185,9 @@ command + orchestrator. If the repo ever moves, update this one path here and in
    `.preeco_bak` backups + the shim artifact dir.
 
 ## Notes
+- **`mode` is required.** When the command is invoked bare (`/genie_eco_msip:eco-analyze`), ask for
+  every input in order: **mode → TileBuilder dir or direct RTL paths → jira → tile**. Never fall
+  back to `complete` silently.
 - **Input styles for `simple` mode:** either a TileBuilder `ref_dir` (positional, like complete),
   or direct explicit fields (`RTL_BEFORE`/`RTL_AFTER` + `NETLIST_SYNTH` **required**, `NETLIST_PREPLACE`
   /`NETLIST_ROUTE` **optional** + `TILE`/`JIRA`), which are turned into a shim ref_dir by

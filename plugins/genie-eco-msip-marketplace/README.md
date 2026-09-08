@@ -1,16 +1,16 @@
-# genie-eco-marketplace
+# genie-eco-msip-marketplace
 
 Internal Claude Code plugin marketplace for the **Genie AI ECO flow**.
 
 ## Plugins
 | Plugin | Description |
 |---|---|
-| `genie_eco` | Run the Genie AI ECO flow (STUDY → APPLY → ROUND → FINAL) end to end. Thin launcher over the genie_agent repo. See `plugins/genie_eco/README.md`. |
+| `genie_eco_msip` | Run the Genie AI ECO flow (STUDY → APPLY → ROUND → FINAL) end to end. Thin launcher over the genie_agent repo. See `plugins/genie_eco_msip/README.md`. |
 
 ## Add + install
 ```
-/plugin marketplace add /home/abinbaba/eco_flow/plugins/genie-eco-marketplace
-/plugin install genie_eco@genie-eco-marketplace
+/plugin marketplace add /home/abinbaba/eco_flow/plugins/genie-eco-msip-marketplace
+/plugin install genie_eco_msip@genie-eco-msip-marketplace
 ```
 Then:
 ```
@@ -19,15 +19,15 @@ Then:
 
 ## Layout
 ```
-genie-eco-marketplace/
-├── .claude-plugin/marketplace.json     # catalog (1 plugin: genie_eco)
+genie-eco-msip-marketplace/
+├── .claude-plugin/marketplace.json     # catalog (1 plugin: genie_eco_msip)
 ├── README.md
-└── plugins/genie_eco/
+└── plugins/genie_eco_msip/
     ├── .claude-plugin/plugin.json
     ├── README.md
     ├── commands/eco-analyze.md
     ├── agents/eco_orchestrator/AGENT.md
-    └── skills/genie_eco/SKILL.md
+    └── skills/genie_eco_msip/SKILL.md
 ```
 
 ## Design: thin launcher
