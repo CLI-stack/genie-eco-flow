@@ -110,6 +110,18 @@ it is absent by design, not unresolved, and must NOT stop the flow.
    SVR-14 / FM-599. Rule of thumb: `output_net` is `X[N]` **and** there is no `port_declaration` with
    `signal_name==X` **and** `module_name==<this gate's module_name>` → `needs_explicit_wire_decl=True`.
 
+7. **Check 59 (Synchronous Reset Verification & Auto-Fix on Register D-inputs).**
+   Whenever a register's D-input or `wire_swap` / `enable_swap` is modified, verify whether the
+   target register in RTL has synchronous reset (`if (IReset) reg <= 0;` or `if (!IReset) ...` in an
+   `always @(posedge)` block on a flop without async reset pin):
+   - Check if the study contains:
+     1. A shared inverter gate `INVD1(reset_signal) -> n_eco_<jira>_ireset_inv` (e.g. `eco_<jira>_ireset_inv`)
+     2. Per-bit AND gates `AN2D1(A1=n_eco_<jira>_ireset_inv, A2=<mux_out>, Z=n_eco_<jira>_nxtd_<bit>)`
+     3. The DFF D-pin rewires or study connections connect to the `AN2D1` output `Z`, NOT to the MUX output.
+   - **If missing:** auto-insert the shared `INVD1` and the per-bit `AN2D1` gates into the study for all
+     present stages, and rewire the DFF D-pins to the `AN2D1` output nets. Never leave a synchronously
+     reset register connected directly to a MUX output without its reset gate.
+
 ## Keep unchanged (pure structural — apply exactly as the complete verifier)
 Check 1 (GAP-15 and_term strategy, from `<TAG>_eco_and_term_port_check.json`), Check 4 (GAP-14 wire
 decl — **but see substitution #6: a new bus-bit gate output needs an explicit `wire [MSB:0]` in its
