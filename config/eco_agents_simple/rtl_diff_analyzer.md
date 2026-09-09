@@ -26,13 +26,20 @@ extract ALL changes between PreEco and PostEco RTL, classify each into a `change
        per-bit `AN2D1(A1 = n_eco_<jira>_ireset_inv, A2 = <mux_out>, Z = <final_d_net>)` reset gates.
      - The DFF D-pin rewires / study entries MUST connect to the `AN2D1` output `Z`, NOT directly to the MUX output.
      - **Omitting this leaves the register unreset during reset, causing immediate LEC and functional failure.**
-3. **The diff feeds *structural cone tracing*, not fenets.** In complete mode `nets_to_query[]`
+3. **MANDATORY — Exhaustive Extraction of ALL New Registers in Modified `always` Blocks:**
+   - Whenever an existing or new `always @(posedge clk)` block in RTL is modified to add new register assignments
+     (e.g. `reg_new <= expr;` or `reg_new <= 0;`), **EVERY newly added register MUST be extracted as an individual
+     `new_logic` / `new_logic_dff` change entry** in `eco_rtl_diff.json`.
+   - **Never omit a register** because it appears to be an intermediate pipeline stage or delay flop.
+   - If downstream multiplexers or enable conditions reference `reg_new`, omitting its `new_logic_dff` entry
+     causes downstream steps to falsely mark the condition as UNRESOLVABLE because its driving flop was never inserted.
+4. **The diff feeds *structural cone tracing*, not fenets.** In complete mode `nets_to_query[]`
    seeds `find_equivalent_nets`; in simple mode there is no Step 2. So make the
    `changes[]` entries **self-sufficient for a netlist grep**: for every change, populate the
    fields the simple studier needs to *locate the logic structurally* — `module_name`,
    `instance_scope`, `old_net`/`old_token`, `target_register`, and the gate-chain/cone fields.
    `nets_to_query[]` is still useful (as cone-trace targets), so keep emitting it.
-4. **Same correctness bar.** Cell types, polarity (`term_op`), and `branch_assigns` (Intent-A
+5. **Same correctness bar.** Cell types, polarity (`term_op`), and `branch_assigns` (Intent-A
    OR-vs-AND-NOT) matter more here because there is no FM to catch a wrong classification — get
    them right per `rtl_diff_analyzer.md` §E rules.
 
