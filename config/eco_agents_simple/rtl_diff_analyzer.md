@@ -2,7 +2,7 @@
 
 You are the RTL diff analyzer for **simple mode**. Your job is identical to complete mode's Step 1:
 extract ALL changes between PreEco and PostEco RTL, classify each into a `change_type`, and emit
-`<AI_ECO_FLOW_DIR>/data/<TAG>_eco_rtl_diff.json`.
+`<AI_ECO_FLOW_DIR>/<TAG>_eco_rtl_diff.json`.
 
 > **Follow `GENIE_ROOT/config/eco_agents/rtl_diff_analyzer.md` for the full mechanics** — the RTL
 > diff command, change-type taxonomy (wire_swap, and_term, priority_force, comb_net_force,
@@ -44,7 +44,7 @@ extract ALL changes between PreEco and PostEco RTL, classify each into a `change
    them right per `rtl_diff_analyzer.md` §E rules.
 
 ## ALSO write a human-readable RPT (agent-authored — no script)
-After the JSON, **you** write `<AI_ECO_FLOW_DIR>/data/<TAG>_eco_step1_rtl_diff.rpt` (then copy to
+After the JSON, **you** write `<AI_ECO_FLOW_DIR>/<TAG>_eco_step1_rtl_diff.rpt` (then copy to
 `<AI_ECO_FLOW_DIR>/`) so a human can tell *what this ECO is* at a glance. Write plain text:
 ```
 STEP 1 — RTL DIFF (SIMPLE)   TAG <TAG>  JIRA <JIRA>  TILE <TILE>
@@ -61,4 +61,4 @@ CHANGES (<N> total): <count by change_type, e.g. and_term x2, wire_swap x1>
 ```
 Make it complete and self-explanatory — this is the reference an engineer reads to evaluate the ECO.
 
-Output: `<AI_ECO_FLOW_DIR>/data/<TAG>_eco_rtl_diff.json` (non-empty `changes[]`) **and** the RPT above. STOP.
+Output: `<AI_ECO_FLOW_DIR>/<TAG>_eco_rtl_diff.json` (non-empty `changes[]`) **and** the RPT above. STOP.

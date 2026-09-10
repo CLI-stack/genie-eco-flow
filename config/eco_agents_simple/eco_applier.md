@@ -10,7 +10,7 @@ validator gate and the downstream FM/round handoff.
 > Passes 2–4 (port_declaration / port_connection / rewire) via `eco_netlist_port_rewire.py`. Read
 > `port_connections_per_stage[<Stage>]` (fall back to flat `port_connections`).
 
-Inputs: `REF_DIR TILE JIRA TAG BASE_DIR AI_ECO_FLOW_DIR` + `<AI_ECO_FLOW_DIR>/data/<TAG>_eco_preeco_study.json`
+Inputs: `REF_DIR TILE JIRA TAG BASE_DIR AI_ECO_FLOW_DIR` + `<AI_ECO_FLOW_DIR>/<TAG>_eco_preeco_study.json`
 (`eco_perl_spec.py` needs `--tag <TAG> --jira <JIRA> --stage <Stage>` — do NOT omit JIRA).
 Edits: `<REF_DIR>/data/PostEco/<Stage>.v.gz` for each stage in `STAGES`.
 
@@ -23,17 +23,17 @@ provided; there is no PostEco netlist for it.
    create `.bak_<TAG>_round1`).
 2. Generate + run the Perl gate spec:
    ```bash
-   python3 script/eco_scripts/eco_perl_spec.py --study <AI_ECO_FLOW_DIR>/data/<TAG>_eco_preeco_study.json \
+   python3 script/eco_scripts/eco_perl_spec.py --study <AI_ECO_FLOW_DIR>/<TAG>_eco_preeco_study.json \
        --ref-dir <REF_DIR> --tag <TAG> --jira <JIRA> --stage <Stage> --round 1 \
-       --output <AI_ECO_FLOW_DIR>/runs/eco_apply_<TAG>_<Stage>.pl \
-       --status <AI_ECO_FLOW_DIR>/data/<TAG>_eco_perl_spec_<Stage>.json
+       --output <AI_ECO_FLOW_DIR>/eco_apply_<TAG>_<Stage>.pl \
+       --status <AI_ECO_FLOW_DIR>/<TAG>_eco_perl_spec_<Stage>.json
    ```
    A stage with no entries produces an empty spec and no-ops — that is fine.
 3. Apply the port/rewire passes with `eco_netlist_port_rewire.py` per the complete applier.
-4. Write `<AI_ECO_FLOW_DIR>/data/<TAG>_eco_applied_round1.json` recording per-stage
+4. Write `<AI_ECO_FLOW_DIR>/<TAG>_eco_applied_round1.json` recording per-stage
    applied/inserted/already_applied counts.
 5. **Author the human-readable Step-4 RPT** (no script) at
-   `<AI_ECO_FLOW_DIR>/data/<TAG>_eco_step4_eco_applied.rpt` (copy to `<AI_ECO_FLOW_DIR>/`) — plain text:
+   `<AI_ECO_FLOW_DIR>/<TAG>_eco_step4_eco_applied.rpt` (copy to `<AI_ECO_FLOW_DIR>/`) — plain text:
    ```
    STEP 4 — ECO APPLIED (SIMPLE)   TAG <TAG>  JIRA <JIRA>  TILE <TILE>
    ==================================================================

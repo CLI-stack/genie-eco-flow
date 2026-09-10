@@ -1,6 +1,6 @@
 # Netlist Studier (SIMPLE mode — structural cone tracing, no fenets)
 
-You are the netlist studier for **simple mode**. You build `<AI_ECO_FLOW_DIR>/data/<TAG>_eco_preeco_study.json`
+You are the netlist studier for **simple mode**. You build `<AI_ECO_FLOW_DIR>/<TAG>_eco_preeco_study.json`
 from the RTL diff **by tracing cones directly in the PreEco netlist** — there is no
 `find_equivalent_nets` (Step 2) rename map. (A structural **verifier** runs after the emitters to
 enrich/resolve your entries — but no fenets and no hard-gate validators.) Your JSON must use
@@ -11,7 +11,7 @@ the **same schema** as complete mode so the deterministic emitters can splice in
 > hand-build), the cell-selection rules (cell types come from the PreEco netlist), and all
 > correctness rules.** This simple MD only replaces *how you resolve RTL signals to gate nets*.
 
-Inputs: `REF_DIR TAG BASE_DIR AI_ECO_FLOW_DIR` + `<AI_ECO_FLOW_DIR>/data/<TAG>_eco_rtl_diff.json`.
+Inputs: `REF_DIR TAG BASE_DIR AI_ECO_FLOW_DIR` + `<AI_ECO_FLOW_DIR>/<TAG>_eco_rtl_diff.json`.
 Netlists: `<REF_DIR>/data/PreEco/{Synthesize,PrePlace,Route}.v.gz`.
 
 ## The one substitution: fenets → structural cone tracing
@@ -93,17 +93,17 @@ invariant, and the DFF entry shape — but feed it a **structural (empty) rename
 the clock/scan pins from the netlist instead of fenets:
 ```bash
 # 1. write a one-time empty rename map (structural fallback trigger)
-echo '{}' > <AI_ECO_FLOW_DIR>/data/<TAG>_empty_rename_map.json
+echo '{}' > <AI_ECO_FLOW_DIR>/<TAG>_empty_rename_map.json
 
 # 2. slice the single change, then emit the DFF entry
-python3 -c "import json; d=json.load(open('<AI_ECO_FLOW_DIR>/data/<TAG>_eco_rtl_diff.json')); \
+python3 -c "import json; d=json.load(open('<AI_ECO_FLOW_DIR>/<TAG>_eco_rtl_diff.json')); \
     print(json.dumps([c for c in d['changes'] if c.get('target_register')=='<TARGET_REG>'][0]))" \
     > /tmp/<TARGET_REG>_change.json
 python3 script/eco_scripts/eco_emit_dff_entry.py \
     --rtl-change /tmp/<TARGET_REG>_change.json --ref-dir <REF_DIR> \
-    --rename-map <AI_ECO_FLOW_DIR>/data/<TAG>_empty_rename_map.json \
+    --rename-map <AI_ECO_FLOW_DIR>/<TAG>_empty_rename_map.json \
     --tag <TAG> --jira <JIRA> --tile-module <tile_module_per_stage> \
-    --base-dir <AI_ECO_FLOW_DIR> --output <AI_ECO_FLOW_DIR>/data/<TAG>_eco_dff_entry_<TARGET_REG>.json
+    --base-dir <AI_ECO_FLOW_DIR> --output <AI_ECO_FLOW_DIR>/<TAG>_eco_dff_entry_<TARGET_REG>.json
 ```
 `resolve_cp_per_stage` automatically uses the **register-instance neighbour anchor** (finding a same-domain DFF
 in the host module) to assign the region-correct clock in PrePlace and Route (e.g. post-CTS clock leaf), falling
@@ -150,6 +150,6 @@ When wiring a previously unconnected output pin on an internal register wrapper 
   `SCRIPT-SELF-FIX: <name> — <bug> → <fix>` in the RPT. Only STOP when the input is *genuinely*
   unresolvable/ambiguous (Rules 1–3 in `SIMPLE_ORCHESTRATOR.md`). See its Correctness-posture Rule 4.
 
-Output: `<AI_ECO_FLOW_DIR>/data/<TAG>_eco_preeco_study.json` with entries for ≥1 stage. STOP.
+Output: `<AI_ECO_FLOW_DIR>/<TAG>_eco_preeco_study.json` with entries for ≥1 stage. STOP.
 Do NOT run fenets or any hard-gate validator (the orchestrator spawns the simple verifier for you,
 right after the emitters, to resolve/enrich your entries).

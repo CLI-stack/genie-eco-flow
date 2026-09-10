@@ -57,7 +57,7 @@ guess — prefer punting the change to complete mode over a silent wrong insert.
 
 ## PRE-FLIGHT
 1. `cd <REF_DIR>`; confirm `data/PreEco/SynRtl/` and `data/SynRtl/` exist.
-2. `mkdir -p <AI_ECO_FLOW_DIR>/data`.
+2. `mkdir -p <AI_ECO_FLOW_DIR>`.
 3. **Determine the STAGES to process.** Synthesize is always present; PrePlace and Route are
    **optional** (a Synthesize-only run is allowed — e.g. simple-mode direct inputs where the user
    gave only `NETLIST_SYNTH`). Set `STAGES` = the subset of `{Synthesize, PrePlace, Route}` whose
@@ -90,7 +90,7 @@ yield the turn silently. Two rules:
 Spawn a **foreground general-purpose sub-agent** (blocking — no `run_in_background`) with the content
 of `GENIE_ROOT/config/eco_agents_simple/rtl_diff_analyzer.md` prepended. Pass
 `REF_DIR TILE JIRA TAG BASE_DIR AI_ECO_FLOW_DIR`.
-Output: `<AI_ECO_FLOW_DIR>/data/<TAG>_eco_rtl_diff.json`. **Relay a one-line status when it returns.**
+Output: `<AI_ECO_FLOW_DIR>/<TAG>_eco_rtl_diff.json`. **Relay a one-line status when it returns.**
 
 **CHECKPOINT:** the file exists and has ≥1 entry in `changes[]`, AND the agent-authored human-readable
 `<TAG>_eco_step1_rtl_diff.rpt` exists (the "what is this ECO" reference). **Do NOT run `eco_validate_step1.py`.**
@@ -121,11 +121,11 @@ normally provides is done by **structural cone tracing** inside Step 3 (studier 
 and_term port classifier (same as complete mode; it is a classifier, not a validator):
 ```bash
 python3 script/eco_scripts/eco_and_term_port_check.py \
-    --rtl-diff <AI_ECO_FLOW_DIR>/data/<TAG>_eco_rtl_diff.json --ref-dir <REF_DIR> \
-    --output <AI_ECO_FLOW_DIR>/data/<TAG>_eco_and_term_port_check.json
+    --rtl-diff <AI_ECO_FLOW_DIR>/<TAG>_eco_rtl_diff.json --ref-dir <REF_DIR> \
+    --output <AI_ECO_FLOW_DIR>/<TAG>_eco_and_term_port_check.json
 ```
 Verify stdout shows `ECO_SCRIPT_LAUNCHED: eco_and_term_port_check.py`. Pass
-`GAP15_CHECK_PATH=<AI_ECO_FLOW_DIR>/data/<TAG>_eco_and_term_port_check.json` to BOTH the studier
+`GAP15_CHECK_PATH=<AI_ECO_FLOW_DIR>/<TAG>_eco_and_term_port_check.json` to BOTH the studier
 (3a) and the verifier (3c) — they read `is_output_port`/`strategy` for each `and_term` from it and do
 NOT re-derive it. (No-op JSON if there are no `and_term` changes.)
 
@@ -134,15 +134,15 @@ Relay: `"Step 3-pre OK — GAP-15 classified (<N> and_term / none). Next: 3a stu
 **3a.** Spawn a **foreground** sub-agent (blocking — no `run_in_background`) with
 `GENIE_ROOT/config/eco_agents_simple/eco_netlist_studier.md` prepended. Pass
 `REF_DIR TILE JIRA TAG BASE_DIR AI_ECO_FLOW_DIR`, the RTL-diff path, and `GAP15_CHECK_PATH`. It builds
-`<AI_ECO_FLOW_DIR>/data/<TAG>_eco_preeco_study.json` by tracing cones directly in the PreEco netlist
+`<AI_ECO_FLOW_DIR>/<TAG>_eco_preeco_study.json` by tracing cones directly in the PreEco netlist
 (no fenets rename map). Wait for its result, then **relay:**
 `"Step 3a OK — studier built <N> study entries/stage. Next: 3b emitters."`
 
 **3b. Run the deterministic emitter chain — WITHOUT `--rename-map`** (they fall back to structural
 netlist resolution). Run from `<BASE_DIR>`, in this order (each is fail-closed; study untouched on error):
 ```bash
-S=<AI_ECO_FLOW_DIR>/data/<TAG>_eco_preeco_study.json
-R=<AI_ECO_FLOW_DIR>/data/<TAG>_eco_rtl_diff.json
+S=<AI_ECO_FLOW_DIR>/<TAG>_eco_preeco_study.json
+R=<AI_ECO_FLOW_DIR>/<TAG>_eco_rtl_diff.json
 python3 script/eco_scripts/eco_expand_chains.py       --rtl-diff $R --study $S --ref-dir <REF_DIR> --jira <JIRA> --output $S
 python3 script/eco_scripts/eco_emit_eq_decode.py      --rtl-diff $R --study $S --jira <JIRA> --ref-dir <REF_DIR> --output $S
 python3 script/eco_scripts/eco_emit_priority_force.py --rtl-diff $R --study $S --jira <JIRA> --ref-dir <REF_DIR> --output $S
@@ -197,7 +197,7 @@ simple verifier is the robustness layer.
 Spawn a **foreground** sub-agent (blocking — no `run_in_background`) with
 `GENIE_ROOT/config/eco_agents_simple/eco_applier.md` prepended.
 Pass `REF_DIR TILE JIRA TAG BASE_DIR AI_ECO_FLOW_DIR` and the study path
-`<AI_ECO_FLOW_DIR>/data/<TAG>_eco_preeco_study.json` (the applier's `eco_perl_spec.py` needs
+`<AI_ECO_FLOW_DIR>/<TAG>_eco_preeco_study.json` (the applier's `eco_perl_spec.py` needs
 `--tag <TAG> --jira <JIRA> --stage <Stage>` for `eco_*` net naming — do NOT omit JIRA).
 It applies the study into `<REF_DIR>/data/PostEco/<Stage>.v.gz` for **each stage in `STAGES`** via
 `eco_perl_spec.py` (gates) + `eco_netlist_port_rewire.py` (ports/rewires), one pass per present stage
@@ -212,7 +212,7 @@ OR the stage legitimately had no entries. **Relay:**
 ---
 
 ## EXIT
-1. Write `<AI_ECO_FLOW_DIR>/data/<TAG>_simple_phase_exited.marker` (one line: `exited <ISO_TIMESTAMP>`).
+1. Write `<AI_ECO_FLOW_DIR>/<TAG>_simple_phase_exited.marker` (one line: `exited <ISO_TIMESTAMP>`).
 2. One-line summary: `"SIMPLE mode complete — Steps 1,3,4 done. Human-readable RPTs
    (step1_rtl_diff / step3_netlist_study / step4_eco_applied) + JSONs under <AI_ECO_FLOW_DIR>;
    PostEco netlists patched. No FM/validators run (simple mode)."`

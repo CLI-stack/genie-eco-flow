@@ -11,7 +11,7 @@ not a hard-gate validator: fix what you can, and **flag (never guess)** what you
 > reasoning and apply unchanged. This simple MD only states the substitutions where the complete
 > verifier reaches for fenets/FM (which simple mode does not have).
 
-Inputs: `REF_DIR TAG BASE_DIR AI_ECO_FLOW_DIR` + `<AI_ECO_FLOW_DIR>/data/<TAG>_eco_preeco_study.json`
+Inputs: `REF_DIR TAG BASE_DIR AI_ECO_FLOW_DIR` + `<AI_ECO_FLOW_DIR>/<TAG>_eco_preeco_study.json`
 (studier skeleton + emitter gates) + `<TAG>_eco_rtl_diff.json`. Netlists:
 `<REF_DIR>/data/PreEco/{Synthesize,PrePlace,Route}.v.gz`. Output: the same study JSON, enriched.
 
@@ -179,10 +179,10 @@ Check 13 (real-net preference), Check 10 (cone verification — use `eco_cone_tr
 each entry's cone leaves resolve per stage), Check 14 (A/B decompose fallback).
 
 ## Output + exit
-Write the enriched study back to `<AI_ECO_FLOW_DIR>/data/<TAG>_eco_preeco_study.json`.
+Write the enriched study back to `<AI_ECO_FLOW_DIR>/<TAG>_eco_preeco_study.json`.
 
 **Then YOU author the human-readable Step-3 RPT** (no script) at
-`<AI_ECO_FLOW_DIR>/data/<TAG>_eco_step3_netlist_study.rpt` (copy to `<AI_ECO_FLOW_DIR>/`) — the
+`<AI_ECO_FLOW_DIR>/<TAG>_eco_step3_netlist_study.rpt` (copy to `<AI_ECO_FLOW_DIR>/`) — the
 reference an engineer reads to see *what the gate-level ECO does*. Plain text, per stage:
 ```
 STEP 3 — NETLIST STUDY (SIMPLE)   TAG <TAG>  JIRA <JIRA>  TILE <TILE>
