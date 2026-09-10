@@ -12,8 +12,12 @@ extract ALL changes between PreEco and PostEco RTL, classify each into a `change
 > JSON schema** — downstream simple-mode emitters read the identical fields.
 
 ## Simple-mode deltas (the only differences from complete mode)
-1. **No validator afterwards.** `eco_validate_step1.py` is NOT run. So your output must be
-   self-consistent and complete on the first pass — there is no validator to bounce it back.
+1. **MANDATORY — Exhaustive Multi-File Inspection (Zero-Assumption Rule):**
+   - Run `diff -rqw --exclude="*.vf" --exclude="*.vfe" --exclude="*.d" <REF_DIR>/data/PreEco/SynRtl/ data/SynRtl/` across the full RTL tree.
+   - For **EVERY SINGLE FILE** reported as differing, you **MUST run `diff -u` individually**.
+   - **CRITICAL:** NEVER skip, discard, or assume a file is non-functional based on its name or top-level prefix (e.g. `gmc_gmcch_0_t_*`, `*_top.v`, `*_ctrl.v`, `*_rep.v`).
+   - A file may ONLY be excluded if its `diff -u` contains literally zero Verilog statements (only comment timestamps or tool execution headers).
+   - If a file contains ANY `wire`, `reg`, `assign`, `always`, port, or mux/logic changes (such as scramble codes, enable terms, or bus rewirings), it **MUST be extracted into `changes[]`**.
 2. **MANDATORY — Synchronous Reset Context on D-input / wire_swap modifications:**
    Whenever modifying or emitting a D-input chain for an existing or new register (e.g. `wire_swap`,
    `enable_swap` companion, or `new_logic_dff`):
