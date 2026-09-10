@@ -105,7 +105,7 @@ All four inputs are **REQUIRED** — there are no defaults, including `mode`.
 3. **Hand off to the orchestrator:**
    - **For `simple` mode:** Spawn a **FOREGROUND** (blocking) sub-agent with `GENIE_ROOT/config/eco_agents_simple/SIMPLE_ORCHESTRATOR.md` prepended:
      `INPUTS: TAG=<tag> REF_DIR=<ref_dir> TILE=<tile> JIRA=<jira> LOG_FILE=<log_file> SPEC_FILE=<spec_file> BASE_DIR=<base_dir> AI_ECO_FLOW_DIR=<ai_eco_flow_dir>`.
-     Wait for completion and verify `<AI_ECO_FLOW_DIR>/data/<TAG>_simple_phase_exited.marker` exists.
+     Wait for completion and verify `<AI_ECO_FLOW_DIR>/<TAG>_simple_phase_exited.marker` exists.
    - **For `complete` mode:** Spawn background sub-agents following `GENIE_ROOT/config/eco_agents/STUDY_ORCHESTRATOR.md` → `APPLY_ORCHESTRATOR.md` → `ROUND_ORCHESTRATOR.md` → `FINAL_ORCHESTRATOR.md` with all hard gates enforced.
 
 3b. **(simple + direct-input style only) Write back patched netlists:**

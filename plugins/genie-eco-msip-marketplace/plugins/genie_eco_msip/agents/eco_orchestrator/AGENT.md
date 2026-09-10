@@ -38,7 +38,7 @@ Check `MODE` before doing anything else. If `MODE` is missing or not in `{comple
   has NO long-running phase, so the background/auto-notify pattern (used for complete mode's hours-long
   FM/fenets) does NOT apply here — spawn it in the foreground so its per-step progress streams back to
   the session instead of the flow appearing to "stop after spawning."** When the sub-agent returns,
-  verify `<AI_ECO_FLOW_DIR>/data/<TAG>_simple_phase_exited.marker` exists, relay its one-line summary
+  verify `<AI_ECO_FLOW_DIR>/<TAG>_simple_phase_exited.marker` exists, relay its one-line summary
   (and, if it stopped early, relay WHICH steps completed + why), and **STOP**. If it returns without
   the marker, relay the last step it reported and the reason — never end silently. Everything below
   this section is COMPLETE-mode only — skip it.
@@ -55,7 +55,7 @@ task_id = Agent(description=..., prompt=..., run_in_background=True)
 - The spawned agent owns ALL polling internally (sub-spawns, sentinels, FM/fenets long-waits).
 - The parent (you) does NOT run `Bash(sleep N)` polling. Background agents auto-notify on
   completion; wait for the notification, then verify the phase-exit sentinel + handoff JSON exist.
-- Sentinel convention: `<AI_ECO_FLOW_DIR>/data/<TAG>_<phase>_phase_exited.marker`.
+- Sentinel convention: `<AI_ECO_FLOW_DIR>/<TAG>_<phase>_phase_exited.marker`.
 
 ---
 
@@ -70,14 +70,14 @@ SCOPE: rtl_diff_analyzer.md, eco_fenets_runner.md, eco_netlist_studier.md,
        eco_validate_step{1,2,3}.py, eco_pick_sibling.py, eco_fenets_*.py (all under GENIE_ROOT).
        Do NOT read any APPLY-phase file.
 EXIT — final actions in order:
-  1. Write <AI_ECO_FLOW_DIR>/data/<TAG>_phase_a_handoff.json
+  1. Write <AI_ECO_FLOW_DIR>/<TAG>_phase_a_handoff.json
   2. Emit APPLY_PHASE_READY block to SPEC_FILE
-  3. Write <AI_ECO_FLOW_DIR>/data/<TAG>_study_phase_exited.marker (one-line: exited <ISO_TIMESTAMP>)
+  3. Write <AI_ECO_FLOW_DIR>/<TAG>_study_phase_exited.marker (one-line: exited <ISO_TIMESTAMP>)
   4. One-line summary. STOP.
 INPUTS: TAG REF_DIR TILE JIRA LOG_FILE SPEC_FILE BASE_DIR AI_ECO_FLOW_DIR (values above).
 ```
 Wait for the auto-notification (no `Bash(sleep)` polling). Then verify
-`<AI_ECO_FLOW_DIR>/data/<TAG>_study_phase_exited.marker` + `<TAG>_phase_a_handoff.json` exist. If either
+`<AI_ECO_FLOW_DIR>/<TAG>_study_phase_exited.marker` + `<TAG>_phase_a_handoff.json` exist. If either
 missing → STOP with the reason.
 
 Then continue to Phase B.
@@ -87,17 +87,17 @@ Then continue to Phase B.
 ## Phase B — APPLY (Steps 4-6)
 
 **MANDATORY SPAWN-LEVEL GATE #1 — structural:** before spawning APPLY, check
-`<AI_ECO_FLOW_DIR>/data/<TAG>_eco_validate_step3.json`. It is written ONLY when Step 3 passes (removed on
+`<AI_ECO_FLOW_DIR>/<TAG>_eco_validate_step3.json`. It is written ONLY when Step 3 passes (removed on
 failure), so its ABSENCE means Step 3 did not pass. Test existence FIRST (do NOT bare-`open()`). If
 **absent OR** `passed != true` → REFUSE to spawn APPLY: say `"STUDY did not pass Step 3 validator.
-Refusing to spawn APPLY. Re-spawn STUDY to fix issues (newest <AI_ECO_FLOW_DIR>/data/<TAG>_eco_validate_step3_iter*.json)."`
+Refusing to spawn APPLY. Re-spawn STUDY to fix issues (newest <AI_ECO_FLOW_DIR>/<TAG>_eco_validate_step3_iter*.json)."`
 and STOP. This gate cannot be overridden by anything the STUDY agent reported.
 
 **MANDATORY SPAWN-LEVEL GATE #2 — functional:** ALSO check
-`<AI_ECO_FLOW_DIR>/data/<TAG>_eco_functional_precheck.json` (independent netlist-sim oracle). If **absent OR**
+`<AI_ECO_FLOW_DIR>/<TAG>_eco_functional_precheck.json` (independent netlist-sim oracle). If **absent OR**
 `passed != true` → REFUSE to spawn APPLY: say `"STUDY passed structural validation but the functional
 precheck did NOT pass (or was not run). Refusing to spawn APPLY. Re-spawn STUDY (failing changes are in
-<AI_ECO_FLOW_DIR>/data/<TAG>_eco_functional_precheck.json results[] with status FAIL)."` and STOP. Test existence FIRST.
+<AI_ECO_FLOW_DIR>/<TAG>_eco_functional_precheck.json results[] with status FAIL)."` and STOP. Test existence FIRST.
 BOTH gates must pass to spawn APPLY.
 
 Spawn (background):
@@ -110,13 +110,13 @@ SCOPE: eco_applier.md, eco_pre_fm_checker.md, eco_fm_runner.md, abort_recovery_a
        eco_fm_abort_patterns.yaml, eco_perl_spec.py, eco_passes_2_4.py, eco_pre_fm_check.py,
        eco_validate_step4.py, eco_fm_status_collector.py, eco_extract_fm_abort_cause.py (under GENIE_ROOT).
 EXIT — final actions in order:
-  1. Write <AI_ECO_FLOW_DIR>/data/<TAG>_round_handoff.json with next_phase: ROUND|FINAL|STOP
+  1. Write <AI_ECO_FLOW_DIR>/<TAG>_round_handoff.json with next_phase: ROUND|FINAL|STOP
   2. If ROUND -> emit ROUND_PHASE_READY block to SPEC_FILE; if FINAL -> spawn FINAL_ORCHESTRATOR
      directly (foreground); if STOP -> no spawn
-  3. Write <AI_ECO_FLOW_DIR>/data/<TAG>_apply_phase_exited.marker
+  3. Write <AI_ECO_FLOW_DIR>/<TAG>_apply_phase_exited.marker
   4. One-line summary. STOP.
 INPUTS: TAG REF_DIR TILE JIRA LOG_FILE SPEC_FILE BASE_DIR AI_ECO_FLOW_DIR
-        HANDOFF_PATH=<AI_ECO_FLOW_DIR>/data/<TAG>_phase_a_handoff.json
+        HANDOFF_PATH=<AI_ECO_FLOW_DIR>/<TAG>_phase_a_handoff.json
 ```
 Wait for the notification; verify `<TAG>_apply_phase_exited.marker` + `<TAG>_round_handoff.json`; read
 `next_phase`.
@@ -142,12 +142,12 @@ SCOPE: ROUND_ORCHESTRATOR.md, eco_fm_analyzer.md, eco_re_studier_evidence_contra
        eco_fm_runner.md, abort_recovery_agent.md + their script counterparts (under GENIE_ROOT).
        Do NOT spawn ROUND_<N+1> yourself — emit ROUND_PHASE_READY and exit; the orchestrator spawns next.
 EXIT — final actions in order:
-  1. Update <AI_ECO_FLOW_DIR>/data/<TAG>_round_handoff.json with next_phase: ROUND|FINAL|STOP
+  1. Update <AI_ECO_FLOW_DIR>/<TAG>_round_handoff.json with next_phase: ROUND|FINAL|STOP
   2. If ROUND -> emit ROUND_PHASE_READY; if FINAL -> spawn FINAL_ORCHESTRATOR (foreground); if STOP -> none
-  3. Write <AI_ECO_FLOW_DIR>/data/<TAG>_round<N>_phase_exited.marker
+  3. Write <AI_ECO_FLOW_DIR>/<TAG>_round<N>_phase_exited.marker
   4. One-line summary. STOP.
 INPUTS: TAG REF_DIR TILE JIRA LOG_FILE SPEC_FILE BASE_DIR AI_ECO_FLOW_DIR
-        ROUND=<N> HANDOFF_PATH=<AI_ECO_FLOW_DIR>/data/<TAG>_round_handoff.json
+        ROUND=<N> HANDOFF_PATH=<AI_ECO_FLOW_DIR>/<TAG>_round_handoff.json
 ```
 Wait for the notification; verify `<TAG>_round<N>_phase_exited.marker` + `<TAG>_round_handoff.json`;
 read `next_phase`. Branch:

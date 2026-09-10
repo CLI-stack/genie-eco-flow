@@ -34,7 +34,7 @@ update it in both places.
 ```
 
 ## Gates (enforced by the orchestrator before APPLY)
-1. `<AI_ECO_FLOW_DIR>/data/<TAG>_eco_validate_step3.json` present AND `passed == true` (structural).
-2. `<AI_ECO_FLOW_DIR>/data/<TAG>_eco_functional_precheck.json` present AND `passed == true` (functional oracle).
+1. `<AI_ECO_FLOW_DIR>/<TAG>_eco_validate_step3.json` present AND `passed == true` (structural).
+2. `<AI_ECO_FLOW_DIR>/<TAG>_eco_functional_precheck.json` present AND `passed == true` (functional oracle).
 
 Both must pass or APPLY is refused.
