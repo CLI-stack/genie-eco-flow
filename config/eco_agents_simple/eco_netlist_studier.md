@@ -90,6 +90,13 @@ rename map) own: equality-decode combinators, `priority_force` cones, `comb_net_
 NOT hand-build those** — just make sure each such change has its `module_name` + `old_net` +
 `target_register`/`term_op`/`branch_assigns` fields so the emitter can ground it structurally.
 
+> **Cross-emitter signal reuse.** If a register guard's new term is an RTL signal a sibling
+> `new_logic_gate` change already realizes (tagged `new_logic_dependency_signal` on that gate's
+> terminal entry), `reg_guard_delta` BINDS to the already-emitted net instead of re-deriving the same
+> logic from raw RTL — this avoids emitting two competing implementations of the same signal, where
+> one would end up dangling (0 fan-out). No manual handling needed; just tag the dependency correctly
+> on the earlier `new_logic_gate` entry so the bind can find it.
+
 ## New-DFF assembly (`new_logic_dff`) — structural, no fenets
 For **every** `new_logic_dff` change, assemble the flop with the same wrapper complete mode uses
 (`eco_emit_dff_entry.py`) — the wrapper is what guarantees the chain topology, the `SE=SI=1'b0`
