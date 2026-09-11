@@ -21,16 +21,20 @@ the netlist. For **every** change in the RTL diff, resolve its `old_net` / signa
 gate-level net **in each stage** using this priority ladder (this is the same ladder complete mode
 falls back to when fenets is absent — see `eco_netlist_studier.md` Priorities 1–4):
 
-1. **Direct name** — decompress the stage netlist once and grep for the bare RTL/`old_net` name.
+1. **Register Output / Neighbour-DFF (MANDATORY Priority 1 for any register signal)** — If the
+   signal is declared as a register (`reg <sig>`) in RTL, find its register instance `<sig>_reg`
+   (or merged multi-bit bank slice) and read its direct `.Q`/`.QN` output net per stage. **NEVER**
+   use a downstream module output port or repeater net with the bare name `<sig>` — Formality cuts at
+   register boundaries, so tapping downstream of the flop's direct `.Q` pin breaks formal equivalence.
+2. **Direct name (Combinational / Primary Input only)** — If the signal is a primary input port or
+   purely combinational wire, decompress the stage netlist once and grep for the bare RTL/`old_net` name.
    If it exists as a real wire/pin, use it. (Synthesize usually matches RTL names directly.)
-2. **Driver trace** — find the cell that *drives* the signal in Synthesize:
+3. **Driver trace** — find the cell that *drives* the combinational signal in Synthesize:
    ```bash
    zcat PreEco/Synthesize.v.gz | grep -nE "\.(Q|Z|ZN)\s*\(\s*<signal>\s*\)"   # → driver inst
    ```
    then locate that **same instance name** in PrePlace/Route and read its output-pin net — that is
    the per-stage gate net (survives P&R even when the net was renamed).
-3. **Neighbour-DFF** — if the signal is a register output, find the register instance (survives DFT
-   unchanged), read its `.Q`/`.QN` net per stage.
 4. **`eco_resolve_synth_internal.py`** — for a synthesis-internal net whose driver chain is absent
    in P&R, call the resolver (backward driver / forward consumer trace) and take its per-stage net.
 
