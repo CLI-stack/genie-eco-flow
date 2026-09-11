@@ -5881,6 +5881,41 @@ def main():
                         f"replace fenets actual_wire with bare RTL name.")
                     break
 
+    # ── Check 67: Register Output Flop .Q Pin Tap Check (Rule 37) ─────────────
+    # For any new logic gate reading an RTL signal that is defined as a register (reg <sig>),
+    # verify that the gate input taps the register instance's direct .Q output pin,
+    # NEVER the downstream module boundary/repeater wire <sig>.
+    # Formality cuts at register boundaries, so tapping downstream of the flop .Q pin
+    # breaks formal equivalence.
+    if args.ref_dir:
+        _synth_txt67 = _load_preeco_text('Synthesize') if '_load_preeco_text' in locals() else ''
+        if _synth_txt67:
+            for _e67 in study.get('Synthesize', []):
+                if _e67.get('change_type') != 'new_logic_gate':
+                    continue
+                _inst67 = _e67.get('instance_name', '?')
+                _mod67 = _e67.get('module_name', '')
+                _pcs67 = _e67.get('port_connections') or {}
+                _mbody67_m = re.search(r'(?m)^module\s+' + re.escape(_mod67) + r'\b.*?^endmodule', _synth_txt67, re.DOTALL)
+                if not _mbody67_m:
+                    continue
+                _mbody67 = _mbody67_m.group(0)
+                for _pin67, _net67 in _pcs67.items():
+                    if _pin67 in ('Z', 'ZN', 'ZN1', 'ZN2', 'Q', 'QN', 'CO', 'S') or not isinstance(_net67, str):
+                        continue
+                    if _net67.startswith(('n_eco_', '1\'b', 'FxPrePlace_', 'FxPlace_', 'FxOptCts_', 'FxCts_')):
+                        continue
+                    # Check if _net67 has a corresponding register instance <_net67>_reg inside module
+                    _reg_match = re.search(r'\b' + re.escape(_net67) + r'_reg(?:_\d+_)?\b[^(]*?\([^;]*?\.Q\s*\(\s*(\w+)\s*\)', _mbody67, re.DOTALL)
+                    if _reg_match:
+                        _flop_q_net = _reg_match.group(1)
+                        if _flop_q_net != _net67:
+                            issues.append(
+                                f"Check 67 FAIL: [Synthesize] gate {_inst67!r} pin .{_pin67}={_net67!r} "
+                                f"taps bare module output wire {_net67!r} instead of direct register flop .Q "
+                                f"pin {_flop_q_net!r} ({_net67}_reg.Q per Rule 37). Formality cuts at register "
+                                f"boundaries — tapping downstream repeater wires causes false LEC failures.")
+
     # ── Mode-I bridge driver-chain completeness ───────────────────────────────
     # A port_connection that feeds a NEW input from a spare UNCONNECTED_* bus bit
     # only works if that bit is actually driven. If the bit sits on a child
