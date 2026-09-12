@@ -34,7 +34,7 @@ All four inputs are **REQUIRED** — there are no defaults, including `mode`.
 | mode | steps | pipeline |
 |---|---|---|
 | `complete` | 1-6 | STUDY (1,2,3) → APPLY (4,5,6) → ROUND loop (on FM mismatch, max 10) → FINAL. Full fenets + validators + Formality. |
-| `simple` | 1,(2 optional),3,4 | STUDY-lite (1 = RTL diff; **2 = fenets, OPTIONAL, off by default** — see Q2.5; 3 = study, structural cone tracing, or fenets-bound if Step 2 ran) → APPLY (4). **No** validators, verifier (beyond simple mode's own structural one), pre-FM, FM, ROUND, FINAL, report, or email — the step-1/(2)/3/4 artifacts are the whole deliverable. |
+| `simple` | 1,(2 optional),3,4 | STUDY-lite (1 = RTL diff; **2 = fenets, OPTIONAL, off by default** — see Q2 for simple mode; 3 = study, structural cone tracing, or fenets-bound if Step 2 ran) → APPLY (4). **No** validators, verifier (beyond simple mode's own structural one), pre-FM, FM, ROUND, FINAL, report, or email — the step-1/(2)/3/4 artifacts are the whole deliverable. |
 
 ## What to do
 
@@ -88,37 +88,38 @@ All four inputs are **REQUIRED** — there are no defaults, including `mode`.
    at a time, in this order, and do NOT proceed until each is answered. **Never invent a default;
    `mode` in particular is REQUIRED, not optional.**
 
+   > **MANDATORY CHECKLIST — there are FIVE questions for `simple` mode, FOUR for `complete` mode.
+   > Do not skip any of them, and do not jump ahead to collecting file paths before all of them are
+   > answered.** Before asking anything, mentally confirm which list applies:
+   > - `complete` mode: **Q1 mode → Q2 design inputs (TileBuilder dir only) → Q3 jira → Q4 tile.**
+   > - `simple` mode: **Q1 mode → Q2 run fenets? → Q3 design inputs → Q4 jira → Q5 tile.**
+   >
+   > Q2 for simple mode ("run fenets?") is its own full question, asked immediately after Q1 and
+   > **before** Q3 (design inputs) — it is NOT optional to ask, NOT a footnote, and NOT something to
+   > infer a default for. A run where the user answered mode=simple and then was asked directly for
+   > `RTL_BEFORE`/`RTL_AFTER`/`NETLIST_SYNTH` **without first being asked Q2** is an incomplete,
+   > out-of-spec execution of this command — go back and ask it before collecting any design inputs.
+
    **Q1 — mode (always first).** Ask via `AskUserQuestion`:
    - `complete` — full STUDY → APPLY → ROUND → FINAL, with fenets, all validators and Formality.
      Requires a TileBuilder directory.
    - `simple` — Steps 1, 3, 4 only. Fast, no Formality/rounds. Accepts either a TileBuilder
      directory or direct RTL/netlist paths.
 
-   **Q2 — the design inputs (branches on the Q1 answer).**
-   - If `mode == complete`: ask for the **TileBuilder directory** (absolute path containing
-     `revrc.main`). This is the only accepted style for `complete` — there is no direct-path option.
-   - If `mode == simple`: ask which input style the user wants, then collect it:
-     - **TileBuilder directory** — an absolute path containing `revrc.main`; or
-     - **direct paths** — `RTL_BEFORE`, `RTL_AFTER` (each a `.v` file OR a directory) and
-       `NETLIST_SYNTH` (**required**), plus `NETLIST_PREPLACE` / `NETLIST_ROUTE` (**optional** —
-       omit for a Synthesize-only run). Accept them pasted in one message
-       (`RTL_BEFORE: … RTL_AFTER: … NETLIST_SYNTH: …`) and ask only for missing REQUIRED fields.
-       If the user gives only `NETLIST_SYNTH`, proceed Synth-only — do NOT ask for PrePlace/Route.
-       This style routes through **step 1b**.
-
-   **Q2.5 — run fenets? (simple mode ONLY — skip entirely for complete mode, which always runs it).**
-   Ask via `AskUserQuestion`, regardless of whether Q2 was answered TileBuilder-dir style or
-   direct-paths style:
+   **Q2 — run fenets? (`simple` mode ONLY — for `complete` mode, skip this question entirely and go
+   straight to its Q2/design-inputs below; complete mode always runs fenets, there is nothing to
+   ask).** If `mode == simple`, this is the very next question — ask it via `AskUserQuestion` BEFORE
+   asking anything about design inputs / input style / RTL paths:
    - `No (default, recommended)` — Step 2 is skipped; Step 3 uses structural cone tracing only
      (today's behavior, unchanged).
    - `Yes` — Step 2 runs. Requires a **separate** input, `FM_SESSION_DIR`: an absolute path to a
      TileBuilder directory that already has a runnable, genuine **PreEco** FM target/session (e.g.
-     `FmEqvPreEcoSynthesizeVsPreEcoSynRtl`). This is required **even when Q2 was answered with the
-     direct-paths style** — `FM_SESSION_DIR` may be the same directory as a TileBuilder-dir-style
-     `ref_dir`, or a completely different directory; it is independent of where the RTL/netlist
-     inputs came from.
+     `FmEqvPreEcoSynthesizeVsPreEcoSynRtl`). This is required **no matter which input style the user
+     picks in Q3 below** — `FM_SESSION_DIR` may end up being the same directory as a
+     TileBuilder-dir-style `ref_dir`, or a completely different directory; it is independent of
+     where the RTL/netlist inputs come from.
 
-   If `Yes`, validate `FM_SESSION_DIR` immediately, before proceeding:
+   If `Yes`, validate `FM_SESSION_DIR` immediately, before proceeding to Q3:
    ```bash
    cd /home/abinbaba/eco_flow
    python3 script/eco_scripts/eco_fm_targets.py --detect <FM_SESSION_DIR> PreEco
@@ -137,14 +138,28 @@ All four inputs are **REQUIRED** — there are no defaults, including `mode`.
    On success, record `RUN_FENETS=true`, `FM_SESSION_DIR=<path>`, and `PREECO_TARGETS=<the validated,
    comma-separated per-stage names>`. On `No`, record `RUN_FENETS=false` (no other fields needed).
 
-   **Q3 — jira.** The ECO ticket number, e.g. `9899`.
+   **Q3 — the design inputs (branches on the Q1 answer; for `complete` mode this is asked as Q2 —
+   see the checklist above).**
+   - If `mode == complete`: ask for the **TileBuilder directory** (absolute path containing
+     `revrc.main`). This is the only accepted style for `complete` — there is no direct-path option.
+   - If `mode == simple`: ask which input style the user wants, then collect it:
+     - **TileBuilder directory** — an absolute path containing `revrc.main`; or
+     - **direct paths** — `RTL_BEFORE`, `RTL_AFTER` (each a `.v` file OR a directory) and
+       `NETLIST_SYNTH` (**required**), plus `NETLIST_PREPLACE` / `NETLIST_ROUTE` (**optional** —
+       omit for a Synthesize-only run). Accept them pasted in one message
+       (`RTL_BEFORE: … RTL_AFTER: … NETLIST_SYNTH: …`) and ask only for missing REQUIRED fields.
+       If the user gives only `NETLIST_SYNTH`, proceed Synth-only — do NOT ask for PrePlace/Route.
+       This style routes through **step 1b**.
 
-   **Q4 — tile.** e.g. `umccmd`, `umcdat`, `ddrss_umc_t`.
+   **Q4 — jira.** The ECO ticket number, e.g. `9899`.
+
+   **Q5 — tile.** e.g. `umccmd`, `umcdat`, `ddrss_umc_t`.
 
    **Validate** before continuing: `mode ∈ {complete, simple}`; a TileBuilder `ref_dir` actually
    contains `revrc.main` (or, for simple + direct paths, the required RTL/netlist paths exist);
-   `jira` and `tile` are non-empty. If a supplied value fails validation, re-ask that one question
-   rather than stopping. Only stop with usage if the user declines to answer:
+   `jira` and `tile` are non-empty; for `simple` mode, `RUN_FENETS` has been explicitly set to
+   `true` or `false` (never left unasked/assumed). If a supplied value fails validation, re-ask that
+   one question rather than stopping. Only stop with usage if the user declines to answer:
    `/genie_eco_msip:eco-analyze <complete|simple> <ref_dir> <jira> <tile>`.
 
 1b. **(simple + direct-input style only) Build a shim ref_dir.** Turn the explicit paths into the
@@ -185,7 +200,7 @@ All four inputs are **REQUIRED** — there are no defaults, including `mode`.
    `eco_orchestrator` agent (this plugin), passing the block's fields (`TAG REF_DIR TILE JIRA
    LOG_FILE SPEC_FILE`) **plus `MODE=<mode>`** (`complete` or `simple`). For `simple` mode, also pass
    `RUN_FENETS=<true|false>` and, when `true`, `FM_SESSION_DIR=<path>` and
-   `PREECO_TARGETS=<validated names>` from Q2.5. The orchestrator branches on MODE: `complete` runs the
+   `PREECO_TARGETS=<validated names>` from Q2 (simple mode). The orchestrator branches on MODE: `complete` runs the
    full STUDY -> APPLY -> ROUND -> FINAL state machine with all hard gates (always with fenets);
    `simple` runs Steps 1,(2 optional),3,4 (via `config/eco_agents_simple/SIMPLE_ORCHESTRATOR.md`,
    which branches on `RUN_FENETS` for its optional Step 2) and stops. Do NOT run the phases yourself.
@@ -235,7 +250,7 @@ All four inputs are **REQUIRED** — there are no defaults, including `mode`.
   Formality/PNR context, all 3 stages).
 - Long-running phases (FM, fenets) are polled INSIDE the spawned agents, never from this
   command's session. See `agents/eco_orchestrator/AGENT.md`.
-- **Simple mode's Step 2 (fenets) is optional (Q2.5), off by default.** Opting in requires a
+- **Simple mode's Step 2 (fenets) is optional (Q2 for simple mode), off by default.** Opting in requires a
   `FM_SESSION_DIR` with a genuine, validated **PreEco** FM target (never a generic/already-repurposed
   target like `FmEqvSynthesizeVsSynRtl` — that lacks the PreEco phase marker and may be pointed at an
   already-ECO'd netlist, which is circular for Step 2's purpose). See `SIMPLE_ORCHESTRATOR.md` STEP 2
