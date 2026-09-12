@@ -31,7 +31,7 @@ All four inputs are **REQUIRED** — there are no defaults, including `mode`.
 | mode | steps | pipeline | output directory |
 |---|---|---|---|
 | `complete` | 1-6 | STUDY (1,2,3) → APPLY (4,5,6) → ROUND loop (on FM mismatch, max 10) → FINAL. Full fenets + validators + Formality. | `<ref_dir>/AI_ECO_FLOW_<TAG>/` |
-| `simple` | 1,3,4 | STUDY-lite (1 = RTL diff; skip 2/fenets, do structural cone tracing; 3 = study) → APPLY (4). No validators, verifier, pre-FM, FM, ROUND, FINAL, report, or email — the step-1/3/4 artifacts are the whole deliverable. | `<ref_dir>/AI_ECO_FLOW_SIMPLE_<TAG>/` |
+| `simple` | 1,(2 optional),3,4 | STUDY-lite (1 = RTL diff; 2 = fenets, OPTIONAL, off by default, see Q2.5; 3 = study, structural cone tracing or fenets-bound if Step 2 ran) → APPLY (4). No validators, verifier (beyond simple mode's own structural one), pre-FM, FM, ROUND, FINAL, report, or email — the step-1/(2)/3/4 artifacts are the whole deliverable. | `<ref_dir>/AI_ECO_FLOW_SIMPLE_<TAG>/` |
 
 ---
 
@@ -75,6 +75,20 @@ All four inputs are **REQUIRED** — there are no defaults, including `mode`.
      - **TileBuilder directory** — an absolute path containing `revrc.main`; or
      - **direct paths** — `RTL_BEFORE`, `RTL_AFTER` (each a `.v` file OR a directory) and `NETLIST_SYNTH` (**required**), plus `NETLIST_PREPLACE` / `NETLIST_ROUTE` (**optional** — omit for Synthesize-only run). Then go to **step 1b**.
 
+   **Q2.5 — run fenets? (simple mode ONLY — complete mode always runs it, skip this question for complete).**
+   Ask via `AskUserQuestion`, regardless of whether Q2 was answered TileBuilder-dir style or direct-paths style:
+   - `No (default, recommended)` — Step 2 is skipped; Step 3 uses structural cone tracing only (unchanged behavior).
+   - `Yes` — Step 2 runs. Requires a **separate** input, `FM_SESSION_DIR`: an absolute path to a TileBuilder directory that already has a runnable, genuine **PreEco** FM target/session (e.g. `FmEqvPreEcoSynthesizeVsPreEcoSynRtl`). Required even when Q2 was answered direct-paths style — `FM_SESSION_DIR` is independent of where the RTL/netlist inputs came from; it may or may not be the same directory.
+
+   If `Yes`, validate `FM_SESSION_DIR` immediately:
+   ```bash
+   cd /home/abinbaba/eco_flow
+   python3 script/eco_scripts/eco_fm_targets.py --detect <FM_SESSION_DIR> PreEco
+   ```
+   This always returns *something* (falls back to canonical names like `FmEqvPreEcoSynthesizeVsPreEcoSynRtl` even when nothing real was found) — do not trust the printed name alone. For each name returned, confirm it is backed by a real file: `<FM_SESSION_DIR>/cmds/<name>.cmd` or a `<FM_SESSION_DIR>/rpts/<name>/` directory. If none are backed by a real file, reject — tell the user what was found instead (e.g. "only `FmEqvSynthesizeVsSynRtl` exists there, which is a normal post-synthesis check, not a PreEco-phase ECO target") and re-ask: a different `FM_SESSION_DIR`, or fall back to `No`. **Never accept a non-PreEco target** as a substitute.
+
+   On success, record `RUN_FENETS=true`, `FM_SESSION_DIR=<path>`, `PREECO_TARGETS=<validated, comma-separated per-stage names>`. On `No`, record `RUN_FENETS=false`.
+
    **Q3 — jira.** The ECO ticket number, e.g. `9855`.
 
    **Q4 — tile.** e.g. `osssys`, `sdma0_gc`, `umcdat`, `umccmd`.
@@ -103,10 +117,11 @@ All four inputs are **REQUIRED** — there are no defaults, including `mode`.
    - For `complete` mode, output dir is `<ref_dir>/AI_ECO_FLOW_<TAG>/`.
 
 3. **Hand off to the orchestrator:**
-   - **For `simple` mode:** Spawn a **FOREGROUND** (blocking) sub-agent with `GENIE_ROOT/config/eco_agents_simple/SIMPLE_ORCHESTRATOR.md` prepended:
-     `INPUTS: TAG=<tag> REF_DIR=<ref_dir> TILE=<tile> JIRA=<jira> LOG_FILE=<log_file> SPEC_FILE=<spec_file> BASE_DIR=<base_dir> AI_ECO_FLOW_DIR=<ai_eco_flow_dir>`.
+   - **For `simple` mode with `RUN_FENETS=false` (the default):** Spawn a **FOREGROUND** (blocking) sub-agent with `GENIE_ROOT/config/eco_agents_simple/SIMPLE_ORCHESTRATOR.md` prepended:
+     `INPUTS: TAG=<tag> REF_DIR=<ref_dir> TILE=<tile> JIRA=<jira> LOG_FILE=<log_file> SPEC_FILE=<spec_file> BASE_DIR=<base_dir> AI_ECO_FLOW_DIR=<ai_eco_flow_dir> RUN_FENETS=false`.
      Wait for completion and verify `<AI_ECO_FLOW_DIR>/<TAG>_simple_phase_exited.marker` exists.
-   - **For `complete` mode:** Spawn background sub-agents following `GENIE_ROOT/config/eco_agents/STUDY_ORCHESTRATOR.md` → `APPLY_ORCHESTRATOR.md` → `ROUND_ORCHESTRATOR.md` → `FINAL_ORCHESTRATOR.md` with all hard gates enforced.
+   - **For `simple` mode with `RUN_FENETS=true`:** Spawn the SAME sub-agent, but in the **BACKGROUND** (same pattern as complete mode below), since its optional Step 2 can take up to ~60 minutes of FM polling/retry — do not block the session that long in the foreground. Pass the same INPUTS plus `RUN_FENETS=true FM_SESSION_DIR=<path> PREECO_TARGETS=<validated names>`. Relay that Step 2 is running in the background before Steps 1/3/4 resume in the foreground once it returns (per `SIMPLE_ORCHESTRATOR.md`'s own internal foreground/background split). Wait for its notification and verify the exit marker as above.
+   - **For `complete` mode:** Spawn background sub-agents following `GENIE_ROOT/config/eco_agents/STUDY_ORCHESTRATOR.md` → `APPLY_ORCHESTRATOR.md` → `ROUND_ORCHESTRATOR.md` → `FINAL_ORCHESTRATOR.md` with all hard gates enforced (always runs fenets).
 
 3b. **(simple + direct-input style only) Write back patched netlists:**
    Overwrite the original `NETLIST_*` paths in place, backing each up as `<path>.preeco_bak` first:
