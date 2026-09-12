@@ -11,8 +11,18 @@ the **same schema** as complete mode so the deterministic emitters can splice in
 > hand-build), the cell-selection rules (cell types come from the PreEco netlist), and all
 > correctness rules.** This simple MD only replaces *how you resolve RTL signals to gate nets*.
 
-Inputs: `REF_DIR TAG BASE_DIR AI_ECO_FLOW_DIR` + `<AI_ECO_FLOW_DIR>/<TAG>_eco_rtl_diff.json`.
+Inputs: `REF_DIR TAG BASE_DIR AI_ECO_FLOW_DIR` + `<AI_ECO_FLOW_DIR>/<TAG>_eco_rtl_diff.json`, plus
+optionally `RENAME_MAP=<AI_ECO_FLOW_DIR>/<TAG>_eco_fenets_rename_map.json` **if and only if** that file
+exists on disk (simple mode's optional Step 2 ran and succeeded).
 Netlists: `<REF_DIR>/data/PreEco/{Synthesize,PrePlace,Route}.v.gz`.
+
+## If a rename map is present (optional Step 2 ran), it wins — otherwise fall back below
+Simple mode normally has no fenets rename map, but Step 2 is now **optional**: if the user opted in and
+it succeeded, `<AI_ECO_FLOW_DIR>/<TAG>_eco_fenets_rename_map.json` exists. When it does, treat it as
+**higher priority** than structural cone tracing for resolving a signal's per-stage gate net — use it
+first, exactly as complete mode's studier does, and only fall back to the priority ladder below for any
+signal the rename map doesn't cover. When the file is absent (the default), proceed with the ladder
+below unchanged.
 
 ## The one substitution: fenets → structural cone tracing
 Complete mode reads the fenets spec/rename-map to learn (a) *which cell/pin* consumes each changed

@@ -34,7 +34,7 @@ All four inputs are **REQUIRED** — there are no defaults, including `mode`.
 | mode | steps | pipeline |
 |---|---|---|
 | `complete` | 1-6 | STUDY (1,2,3) → APPLY (4,5,6) → ROUND loop (on FM mismatch, max 10) → FINAL. Full fenets + validators + Formality. |
-| `simple` | 1,3,4 | STUDY-lite (1 = RTL diff; **skip 2/fenets**, do structural cone tracing; 3 = study) → APPLY (4). **No** validators, verifier, pre-FM, FM, ROUND, FINAL, report, or email — the step-1/3/4 artifacts are the whole deliverable. |
+| `simple` | 1,(2 optional),3,4 | STUDY-lite (1 = RTL diff; **2 = fenets, OPTIONAL, off by default** — see Q2.5; 3 = study, structural cone tracing, or fenets-bound if Step 2 ran) → APPLY (4). **No** validators, verifier (beyond simple mode's own structural one), pre-FM, FM, ROUND, FINAL, report, or email — the step-1/(2)/3/4 artifacts are the whole deliverable. |
 
 ## What to do
 
@@ -106,6 +106,37 @@ All four inputs are **REQUIRED** — there are no defaults, including `mode`.
        If the user gives only `NETLIST_SYNTH`, proceed Synth-only — do NOT ask for PrePlace/Route.
        This style routes through **step 1b**.
 
+   **Q2.5 — run fenets? (simple mode ONLY — skip entirely for complete mode, which always runs it).**
+   Ask via `AskUserQuestion`, regardless of whether Q2 was answered TileBuilder-dir style or
+   direct-paths style:
+   - `No (default, recommended)` — Step 2 is skipped; Step 3 uses structural cone tracing only
+     (today's behavior, unchanged).
+   - `Yes` — Step 2 runs. Requires a **separate** input, `FM_SESSION_DIR`: an absolute path to a
+     TileBuilder directory that already has a runnable, genuine **PreEco** FM target/session (e.g.
+     `FmEqvPreEcoSynthesizeVsPreEcoSynRtl`). This is required **even when Q2 was answered with the
+     direct-paths style** — `FM_SESSION_DIR` may be the same directory as a TileBuilder-dir-style
+     `ref_dir`, or a completely different directory; it is independent of where the RTL/netlist
+     inputs came from.
+
+   If `Yes`, validate `FM_SESSION_DIR` immediately, before proceeding:
+   ```bash
+   cd /home/abinbaba/eco_flow
+   python3 script/eco_scripts/eco_fm_targets.py --detect <FM_SESSION_DIR> PreEco
+   ```
+   This always returns *something* (it falls back to canonical names like
+   `FmEqvPreEcoSynthesizeVsPreEcoSynRtl` even when nothing real was found) — **do not trust the
+   printed name alone.** For each name returned, confirm it is backed by a real file on disk:
+   `<FM_SESSION_DIR>/cmds/<name>.cmd` or a `<FM_SESSION_DIR>/rpts/<name>/` directory. If **none** of
+   the returned names have real backing files, reject: tell the user plainly what was found instead
+   (e.g. "only `FmEqvSynthesizeVsSynRtl` exists there — that's a normal post-synthesis check, not a
+   PreEco-phase ECO target, so it can't be reused for fenets") and re-ask — either a different
+   `FM_SESSION_DIR`, or fall back to `No`. **Never accept a non-PreEco target** (anything without
+   `PreEco` in its name) as a substitute, and never silently proceed on the canonical-fallback string
+   if it isn't backed by a real file.
+
+   On success, record `RUN_FENETS=true`, `FM_SESSION_DIR=<path>`, and `PREECO_TARGETS=<the validated,
+   comma-separated per-stage names>`. On `No`, record `RUN_FENETS=false` (no other fields needed).
+
    **Q3 — jira.** The ECO ticket number, e.g. `9899`.
 
    **Q4 — tile.** e.g. `umccmd`, `umcdat`, `ddrss_umc_t`.
@@ -152,15 +183,22 @@ All four inputs are **REQUIRED** — there are no defaults, including `mode`.
 
 3. **Hand off to the orchestrator.** When you see `ECO_ANALYZE_MODE_ENABLED`, spawn the
    `eco_orchestrator` agent (this plugin), passing the block's fields (`TAG REF_DIR TILE JIRA
-   LOG_FILE SPEC_FILE`) **plus `MODE=<mode>`** (`complete` or `simple`). The orchestrator branches
-   on MODE: `complete` runs the full STUDY -> APPLY -> ROUND -> FINAL state machine with all hard
-   gates; `simple` runs only Steps 1,3,4 (via `config/eco_agents_simple/`) and stops. Do NOT run
-   the phases yourself.
-   - **For `simple` mode, spawn `eco_orchestrator` in the FOREGROUND (blocking — no
-     `run_in_background`).** Simple mode is fast (minutes) with no long-running FM/fenets phase, so
-     running it foreground streams its per-step progress ("Step 1 OK …", "Step 3a OK …") straight to
-     the session. The background/auto-notify pattern is for `complete` mode only; using it for simple
-     mode is what makes the flow look like it "spawned an agent and stopped" without any update.
+   LOG_FILE SPEC_FILE`) **plus `MODE=<mode>`** (`complete` or `simple`). For `simple` mode, also pass
+   `RUN_FENETS=<true|false>` and, when `true`, `FM_SESSION_DIR=<path>` and
+   `PREECO_TARGETS=<validated names>` from Q2.5. The orchestrator branches on MODE: `complete` runs the
+   full STUDY -> APPLY -> ROUND -> FINAL state machine with all hard gates (always with fenets);
+   `simple` runs Steps 1,(2 optional),3,4 (via `config/eco_agents_simple/SIMPLE_ORCHESTRATOR.md`,
+   which branches on `RUN_FENETS` for its optional Step 2) and stops. Do NOT run the phases yourself.
+   - **For `simple` mode with `RUN_FENETS=false` (the default), spawn `eco_orchestrator` in the
+     FOREGROUND (blocking — no `run_in_background`).** This path is fast (minutes) with no
+     long-running FM/fenets phase, so running it foreground streams its per-step progress ("Step 1
+     OK …", "Step 3a OK …") straight to the session. Using the background/auto-notify pattern here is
+     what makes the flow look like it "spawned an agent and stopped" without any update.
+   - **For `simple` mode with `RUN_FENETS=true`, spawn `eco_orchestrator` in the BACKGROUND** (same
+     pattern as `complete` mode), since its optional Step 2 can take up to ~60 minutes of FM
+     polling/retry — blocking the session that long in the foreground is not acceptable. Relay that
+     Step 2 is running in the background before Steps 1/3/4 resume in the foreground once it returns
+     (per `SIMPLE_ORCHESTRATOR.md`'s own internal foreground/background split for this case).
    - **For `complete` mode, spawn in the background** per the phase pattern (STUDY/APPLY/ROUND own
      their hours-long internal polling).
 
@@ -197,4 +235,10 @@ All four inputs are **REQUIRED** — there are no defaults, including `mode`.
   Formality/PNR context, all 3 stages).
 - Long-running phases (FM, fenets) are polled INSIDE the spawned agents, never from this
   command's session. See `agents/eco_orchestrator/AGENT.md`.
+- **Simple mode's Step 2 (fenets) is optional (Q2.5), off by default.** Opting in requires a
+  `FM_SESSION_DIR` with a genuine, validated **PreEco** FM target (never a generic/already-repurposed
+  target like `FmEqvSynthesizeVsSynRtl` — that lacks the PreEco phase marker and may be pointed at an
+  already-ECO'd netlist, which is circular for Step 2's purpose). See `SIMPLE_ORCHESTRATOR.md` STEP 2
+  for the full validation/fallback behavior. Fenets failure/timeout in simple mode is non-fatal — Step
+  3 always proceeds, with or without a rename map.
 - This command does not modify any genie_agent file; it only launches the existing flow.

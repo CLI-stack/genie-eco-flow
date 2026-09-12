@@ -23,17 +23,22 @@ stage only. **Never flag `NET-ABSENT-IN-STAGE` / `UNRESOLVABLE` for a stage that
 it is absent by design, not unresolved, and must NOT stop the flow.
 
 ## Simple-mode substitutions (the ONLY differences from the complete verifier)
-1. **No fenets rename map / `SPEC_SOURCES` / `actual_wire_<stage>`.** These files **do not exist** in
-   simple mode — the complete verifier reads `<TAG>_eco_fenets_rename_map.json`, `SPEC_SOURCES`, and
-   step-2 spec JSONs, none of which simple mode produces (there is no Step 2). Wherever the complete
-   verifier opens one of those, **do NOT abort on the missing file**: treat the rename map as `{}`,
-   treat every net's spec source as `FALLBACK` (structural), and skip the fenets-priority branch
-   entirely. The ONE fenets-substitute file that DOES exist and you MUST use is the GAP-15 classifier
-   output the orchestrator passes as `GAP15_CHECK_PATH` (`<TAG>_eco_and_term_port_check.json`) — read
-   `is_output_port`/`strategy` from it for Check 1; do not re-derive. In **Check 2 (per-stage net
-   resolution)** and **Check 10 (cone verification)**, DROP the fenets priorities (the complete
-   verifier's Priority `-1` and `5`). Use ONLY the structural ladder (its Priorities 0–4): bare name
-   present in all stages → structural **driver trace** → **neighbour-DFF** → resolver. Run that ladder
+1. **No fenets rename map / `SPEC_SOURCES` / `actual_wire_<stage>` — UNLESS the optional Step 2 ran.**
+   By default these files **do not exist** in simple mode (there is no Step 2). But Step 2 is now
+   **optional**: if the user opted in and it succeeded, `<AI_ECO_FLOW_DIR>/<TAG>_eco_fenets_rename_map.json`
+   exists. **Check for that file first.** If it exists, use it exactly as the complete verifier does —
+   at the SAME fenets-priority tier (Priority `-1`/`5`) in Checks 2 and 10 — and only drop to the
+   structural ladder below for entries it doesn't cover. If it does NOT exist (the default), the
+   complete verifier reads `<TAG>_eco_fenets_rename_map.json`, `SPEC_SOURCES`, and step-2 spec JSONs,
+   none of which simple mode produces. Wherever the complete verifier opens one of those, **do NOT
+   abort on the missing file**: treat the rename map as `{}`, treat every net's spec source as
+   `FALLBACK` (structural), and skip the fenets-priority branch entirely. The ONE fenets-substitute file
+   that ALWAYS exists and you MUST use regardless is the GAP-15 classifier output the orchestrator
+   passes as `GAP15_CHECK_PATH` (`<TAG>_eco_and_term_port_check.json`) — read `is_output_port`/`strategy`
+   from it for Check 1; do not re-derive. In **Check 2 (per-stage net resolution)** and **Check 10 (cone
+   verification)**, when no rename map is present, DROP the fenets priorities (the complete verifier's
+   Priority `-1` and `5`) and use ONLY the structural ladder (its Priorities 0–4): bare name present in
+   all stages → structural **driver trace** → **neighbour-DFF** → resolver. Run that ladder
    deterministically with `eco_cone_trace.py`:
    ```bash
    python3 script/eco_scripts/eco_cone_trace.py resolve \
