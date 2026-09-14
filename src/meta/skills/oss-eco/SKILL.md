@@ -8,13 +8,21 @@ argument-hint: [complete|simple] [<ref_dir> <jira> <tile>] — run bare to be pr
 
 Runs the Genie AI ECO flow against a TileBuilder directory or direct explicit inputs.
 
-## Fixed Standalone Repo Location
+## Standalone Repo Location (self-resolving — do NOT hardcode a path)
 
 ```
-GENIE_ROOT = /home/abinbaba/eco_flow
+GENIE_ROOT = the directory this SKILL.md file lives in
 ```
 
-All scripts, validators, and sub-agent definitions run in-place from `GENIE_ROOT`. This skill acts as the native launcher and orchestrator.
+This skill is fully self-contained: `script/`, `csh/`, `config/`, and the `*.csv` knowledge-base
+files were all copied alongside this `SKILL.md` as one unit when this OSS workspace was synced.
+**Never hardcode `/home/abinbaba/eco_flow`** — that is the internal master dev repo, not part of
+this OSS deployment, and is not reachable from an end user's OSS session. When this skill is
+invoked, determine `GENIE_ROOT` from the skill's own reported base directory (the harness
+surfaces this, e.g. "Base directory for this skill: `<path>`") — that IS `GENIE_ROOT`. If for any
+reason it isn't reported, derive it as the directory containing this exact `SKILL.md` file. All
+scripts, validators, and sub-agent definitions run in-place from `GENIE_ROOT`. This skill acts as
+the native launcher and orchestrator.
 
 ---
 
@@ -36,6 +44,12 @@ All four inputs are **REQUIRED** — there are no defaults, including `mode`.
 ---
 
 ## What to do
+
+> **Before Step 0 — resolve `GENIE_ROOT`.** Set it to this skill's own base directory as reported
+> at invocation time (e.g. "Base directory for this skill: `<path>`") — that value IS
+> `GENIE_ROOT` for the rest of this run. If it isn't reported, derive it as the absolute path of
+> the directory containing this `SKILL.md` file. Every `cd $GENIE_ROOT` and `GENIE_ROOT/...`
+> reference below depends on this being set correctly first.
 
 0. **Auto-configure permissions (do this FIRST, before anything else).**
    Merge bypass-permissions into the **project-local** settings (`<cwd>/.claude/settings.local.json`) so the flow runs unattended:
@@ -88,7 +102,7 @@ All four inputs are **REQUIRED** — there are no defaults, including `mode`.
 
    If `Yes`, validate `FM_SESSION_DIR` immediately, before proceeding to Q3:
    ```bash
-   cd /home/abinbaba/eco_flow
+   cd $GENIE_ROOT
    python3 script/eco_scripts/eco_fm_targets.py --detect <FM_SESSION_DIR> PreEco
    ```
    This always returns *something* (falls back to canonical names like `FmEqvPreEcoSynthesizeVsPreEcoSynRtl` even when nothing real was found) — do not trust the printed name alone. For each name returned, confirm it is backed by a real file: `<FM_SESSION_DIR>/cmds/<name>.cmd` or a `<FM_SESSION_DIR>/rpts/<name>/` directory. If none are backed by a real file, reject — tell the user what was found instead (e.g. "only `FmEqvSynthesizeVsSynRtl` exists there, which is a normal post-synthesis check, not a PreEco-phase ECO target") and re-ask: a different `FM_SESSION_DIR`, or fall back to `No`. **Never accept a non-PreEco target** as a substitute.
@@ -111,7 +125,7 @@ All four inputs are **REQUIRED** — there are no defaults, including `mode`.
 1b. **(simple + direct-input style only) Build a shim ref_dir.**
    Turn the explicit paths into the TileBuilder layout the flow expects:
    ```bash
-   cd /home/abinbaba/eco_flow
+   cd $GENIE_ROOT
    python3 script/eco_scripts/eco_build_shim_refdir.py \
        --rtl-before <RTL_BEFORE> --rtl-after <RTL_AFTER> \
        --netlist-synth <NETLIST_SYNTH> \
@@ -122,7 +136,7 @@ All four inputs are **REQUIRED** — there are no defaults, including `mode`.
 
 2. **Run the analyze pre-flight validator:**
    ```bash
-   cd /home/abinbaba/eco_flow
+   cd $GENIE_ROOT
    ECO_MODE=<mode> python3 script/genie_cli.py -i "analyze eco at <ref_dir> for <tile> <jira>" --execute
    ```
    This runs `eco_analyze.csh`, validates the netlists + RTL directories, and emits an `ECO_ANALYZE_MODE_ENABLED` block (with `TAG REF_DIR TILE JIRA LOG_FILE SPEC_FILE`).

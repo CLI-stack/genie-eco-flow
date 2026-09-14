@@ -12,8 +12,13 @@ read exactly what the ECO is and what was applied.
 > `GENIE_ROOT/config/eco_agents/CRITICAL_RULES.md`. These universal correctness rules (polarity,
 > shared-chain, scan pins, cell selection) are **shared** with complete mode and apply here too.
 
-`GENIE_ROOT = /home/abinbaba/eco_flow`. Simple-mode MDs live under `GENIE_ROOT/config/eco_agents_simple/`;
-all scripts under `GENIE_ROOT/script/eco_scripts/`.
+`GENIE_ROOT` is inherited from whichever caller spawned this orchestrator — do NOT hardcode it
+here. This file is shared verbatim between two deployments: the marketplace-plugin path (where
+`GENIE_ROOT = /home/abinbaba/eco_flow`, the master dev repo) and the standalone OSS skill path
+(where `GENIE_ROOT` is that skill's own self-contained base directory, e.g.
+`<refdir>/src/meta/skills/oss-eco/`, NOT `/home/abinbaba/eco_flow`, which isn't reachable from an
+OSS deployment). Use whatever `GENIE_ROOT` value the caller already established. Simple-mode MDs
+live under `GENIE_ROOT/config/eco_agents_simple/`; all scripts under `GENIE_ROOT/script/eco_scripts/`.
 
 ## Inputs (from the SIMPLE spawn)
 `TAG  REF_DIR  TILE  JIRA  LOG_FILE  SPEC_FILE  BASE_DIR  AI_ECO_FLOW_DIR`, plus optionally
