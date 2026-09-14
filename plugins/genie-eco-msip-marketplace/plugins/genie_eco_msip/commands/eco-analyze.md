@@ -113,30 +113,72 @@ All four inputs are **REQUIRED** — there are no defaults, including `mode`.
    - `No (default, recommended)` — Step 2 is skipped; Step 3 uses structural cone tracing only
      (today's behavior, unchanged).
    - `Yes` — Step 2 runs. Requires a **separate** input, `FM_SESSION_DIR`: an absolute path to a
-     TileBuilder directory that already has a runnable, genuine **PreEco** FM target/session (e.g.
-     `FmEqvPreEcoSynthesizeVsPreEcoSynRtl`). This is required **no matter which input style the user
-     picks in Q3 below** — `FM_SESSION_DIR` may end up being the same directory as a
-     TileBuilder-dir-style `ref_dir`, or a completely different directory; it is independent of
-     where the RTL/netlist inputs come from.
+     TileBuilder directory containing an FM target whose `.cmd` reads the true pre-ECO baseline
+     netlist (verified by content, not by name — see below; typically a PreEco-phase target like
+     `FmEqvPreEcoSynthesizeVsPreEcoSynRtl`, but any target name qualifies if it genuinely reads the
+     baseline). This is required **no matter which input style the user picks in Q3 below** —
+     `FM_SESSION_DIR` may end up being the same directory as a TileBuilder-dir-style `ref_dir`, or a
+     completely different directory; it is independent of where the RTL/netlist inputs come from.
 
-   If `Yes`, validate `FM_SESSION_DIR` immediately, before proceeding to Q3:
+   If `Yes`, validate `FM_SESSION_DIR` immediately, before proceeding to Q3. **Validation is
+   CONTENT-based, not name-based**: what matters is whether a target's `.cmd` actually reads the
+   TRUE pre-ECO baseline netlist (`FM_SESSION_DIR/data/PreEco/<Stage>.v[.gz]`), not whether its name
+   contains `PreEco`. (Proven on JIRA-11233: `FmEqvSynthesizeVsSynRtl` — a normal post-synthesis
+   target with no `PreEco` in its name — served `find_equivalent_nets` correctly once pointed at a
+   true baseline netlist; a name-substring check would have wrongly rejected it.)
+
+   **Step A — auto-detect (fast path, no extra question in the common case):**
    ```bash
    cd /home/abinbaba/eco_flow
    python3 script/eco_scripts/eco_fm_targets.py --detect <FM_SESSION_DIR> PreEco
    ```
-   This always returns *something* (it falls back to canonical names like
-   `FmEqvPreEcoSynthesizeVsPreEcoSynRtl` even when nothing real was found) — **do not trust the
-   printed name alone.** For each name returned, confirm it is backed by a real file on disk:
-   `<FM_SESSION_DIR>/cmds/<name>.cmd` or a `<FM_SESSION_DIR>/rpts/<name>/` directory. If **none** of
-   the returned names have real backing files, reject: tell the user plainly what was found instead
-   (e.g. "only `FmEqvSynthesizeVsSynRtl` exists there — that's a normal post-synthesis check, not a
-   PreEco-phase ECO target, so it can't be reused for fenets") and re-ask — either a different
-   `FM_SESSION_DIR`, or fall back to `No`. **Never accept a non-PreEco target** (anything without
-   `PreEco` in its name) as a substitute, and never silently proceed on the canonical-fallback string
-   if it isn't backed by a real file.
+   This always returns *something* per active stage (comma-separated) — it falls back to canonical
+   names like `FmEqvPreEcoSynthesizeVsPreEcoSynRtl` even when nothing real was found on disk.
 
-   On success, record `RUN_FENETS=true`, `FM_SESSION_DIR=<path>`, and `PREECO_TARGETS=<the validated,
-   comma-separated per-stage names>`. On `No`, record `RUN_FENETS=false` (no other fields needed).
+   **Step B — content-verify each detected name, per stage:**
+   ```bash
+   cd /home/abinbaba/eco_flow
+   python3 script/eco_scripts/eco_fm_targets.py --verify-content <FM_SESSION_DIR> <target_name>
+   ```
+   Prints `RESULT=` one of `MATCH | MISMATCH | NO_CMD_FILE | NO_STAGE | NO_NETLIST_LINE | NO_BASELINE
+   | UNREADABLE`, plus the resolved `CMD_NETLIST=` / `BASELINE_NETLIST=` paths for messaging.
+   - **`MATCH` for every active stage** → this is the common case (a genuine TileBuilder dir that
+     already ran real PreEco FM targets). Accept **silently — do not ask the user to name a target**;
+     the user already answered Yes + gave a directory, nothing more is needed from them. Record each
+     matched name into `PREECO_TARGETS`.
+   - **Anything else, for one or more stages** → fall back to **Step C** for just those stages.
+
+   **Step C — manual override fallback (only entered when Step B fails for a stage):**
+   Tell the user plainly what went wrong for that stage, using the `RESULT`:
+   - `NO_CMD_FILE` — "no PreEco-phase target exists here for `<stage>`; only non-PreEco targets were
+     found" (list what's actually in `cmds/` if useful).
+   - `MISMATCH` — "a `<stage>` target exists, but its `.cmd` reads a netlist that doesn't match the
+     true baseline (`<CMD_NETLIST>` vs `<BASELINE_NETLIST>`) — likely repointed at an already-ECO'd or
+     different netlist."
+   - `NO_BASELINE` — "this directory has no `data/PreEco/<stage>.v[.gz]` snapshot at all." **This does
+     NOT necessarily mean fenets is impossible here** — some TileBuilder dirs (esp. a tile several ECOs
+     deep) never keep that snapshot, even though a real baseline exists elsewhere (a `.preeco_bak`-style
+     backup, a prior ECO's PostEco netlist, etc. — check the target's `.cmd` for commented-out
+     `read_verilog` lines referencing an earlier ECO's output, a strong hint of where the true lineage
+     baseline lives). Offer the user a THIRD option beyond retry-name / different-dir / skip: **supply
+     the true baseline netlist path directly**, then re-run with the override:
+     ```bash
+     python3 script/eco_scripts/eco_fm_targets.py --verify-content <FM_SESSION_DIR> <target_name> \
+         --baseline <user_supplied_baseline_path>
+     ```
+     Only a `MATCH` from this override run is accepted.
+   Then ask: give a **different target name** to try for `<stage>` (any name, PreEco-named or not —
+   e.g. `FmEqvSynthesizeVsSynRtl`), a **different `FM_SESSION_DIR`**, supply a **baseline netlist path
+   override** (see `NO_BASELINE` above), or **skip fenets for `<stage>`** (falls back to
+   structural-only for that stage) / **skip fenets entirely** (falls back to `No`). Re-run Step B's
+   `--verify-content` (with or without `--baseline`) on whatever is supplied; only a `MATCH` is
+   accepted — loop Step C until resolved or the user opts out. **Never accept anything but `MATCH`**
+   as a substitute.
+
+   On success (every needed stage resolved to a `MATCH`), record `RUN_FENETS=true`,
+   `FM_SESSION_DIR=<path>`, and `PREECO_TARGETS=<the content-verified, comma-separated per-stage
+   names>`. On `No`, or if the user opts out entirely in Step C, record `RUN_FENETS=false` (no other
+   fields needed).
 
    **Q3 — the design inputs (branches on the Q1 answer; for `complete` mode this is asked as Q2 —
    see the checklist above).**
@@ -251,9 +293,10 @@ All four inputs are **REQUIRED** — there are no defaults, including `mode`.
 - Long-running phases (FM, fenets) are polled INSIDE the spawned agents, never from this
   command's session. See `agents/eco_orchestrator/AGENT.md`.
 - **Simple mode's Step 2 (fenets) is optional (Q2 for simple mode), off by default.** Opting in requires a
-  `FM_SESSION_DIR` with a genuine, validated **PreEco** FM target (never a generic/already-repurposed
-  target like `FmEqvSynthesizeVsSynRtl` — that lacks the PreEco phase marker and may be pointed at an
-  already-ECO'd netlist, which is circular for Step 2's purpose). See `SIMPLE_ORCHESTRATOR.md` STEP 2
-  for the full validation/fallback behavior. Fenets failure/timeout in simple mode is non-fatal — Step
-  3 always proceeds, with or without a rename map.
+  `FM_SESSION_DIR` with a per-stage target that is **content-verified** (via
+  `eco_fm_targets.py --verify-content`) to read the true `data/PreEco/<Stage>.v[.gz]` baseline netlist
+  — validation is NOT based on the target's name; a non-PreEco-named target that genuinely reads the
+  baseline is accepted, and a PreEco-named target that has been repointed elsewhere is rejected. See
+  `SIMPLE_ORCHESTRATOR.md` STEP 2 for the full validation/fallback behavior. Fenets failure/timeout in
+  simple mode is non-fatal — Step 3 always proceeds, with or without a rename map.
 - This command does not modify any genie_agent file; it only launches the existing flow.

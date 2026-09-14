@@ -121,10 +121,14 @@ that fenets normally provides is done by **structural cone tracing** inside Step
 **If `RUN_FENETS=false` (the default):** do NOT run any `eco_fenets_*` script. Proceed straight to
 Step 3 exactly as documented below (no rename map anywhere).
 
-**If `RUN_FENETS=true`:** the entry point (`/eco-analyze`) has already validated that `FM_SESSION_DIR`
-contains a real, on-disk PreEco FM target for each stage in `PREECO_TARGETS` (backed by an actual
-`cmds/<name>.cmd` or `rpts/<name>/`, not just the `eco_fm_targets.py` canonical-fallback string). Do
-NOT re-validate from scratch, but DO sanity-check the paths still exist before spawning (they could
+**If `RUN_FENETS=true`:** the entry point (`/eco-analyze`) has already **content-verified** each name
+in `PREECO_TARGETS` — via `eco_fm_targets.py --verify-content <FM_SESSION_DIR> <target_name>`, an
+md5 comparison of what the target's `.cmd` actually reads against the true
+`FM_SESSION_DIR/data/PreEco/<Stage>.v[.gz]` baseline. This is a **content**, not name, check: a
+target's name does not need to contain `"PreEco"` to be accepted (a target like
+`FmEqvSynthesizeVsSynRtl` is equally valid once verified to read the true baseline), and a
+`PreEco`-named target that has been repointed elsewhere would have been rejected at the entry point.
+Do NOT re-validate from scratch, but DO sanity-check the paths still exist before spawning (they could
 have been removed between validation and now).
 
 Spawn the **same** `GENIE_ROOT/config/eco_agents/eco_fenets_runner.md` sub-agent complete mode uses,
