@@ -121,15 +121,15 @@ that fenets normally provides is done by **structural cone tracing** inside Step
 **If `RUN_FENETS=false` (the default):** do NOT run any `eco_fenets_*` script. Proceed straight to
 Step 3 exactly as documented below (no rename map anywhere).
 
-**If `RUN_FENETS=true`:** the entry point (`/eco-analyze`) has already **content-verified** each name
-in `PREECO_TARGETS` — via `eco_fm_targets.py --verify-content <FM_SESSION_DIR> <target_name>`, an
-md5 comparison of what the target's `.cmd` actually reads against the true
-`FM_SESSION_DIR/data/PreEco/<Stage>.v[.gz]` baseline. This is a **content**, not name, check: a
-target's name does not need to contain `"PreEco"` to be accepted (a target like
-`FmEqvSynthesizeVsSynRtl` is equally valid once verified to read the true baseline), and a
-`PreEco`-named target that has been repointed elsewhere would have been rejected at the entry point.
-Do NOT re-validate from scratch, but DO sanity-check the paths still exist before spawning (they could
-have been removed between validation and now).
+**If `RUN_FENETS=true`:** the entry point (`/eco-analyze`) has already **verified each name in
+`PREECO_TARGETS` has an actual FM session** — via `eco_fm_targets.py --verify-session <FM_SESSION_DIR>
+<target_name>`, which checks for an existing `<target_name>_{passed,failed}.fss` file under
+`rpts/<target_name>/<target_name>_runData/`. This is an **existence**, not name or content, check: a
+target's name does not need to contain `"PreEco"` to be accepted, and neither its `.cmd` nor its
+current netlist is inspected — a target whose session has been run at all (pass or fail) is invocable
+(e.g. via `TileBuilderIntFM <target_name>`) and accepted. Do NOT re-validate from scratch, but DO
+sanity-check the paths still exist before spawning (they could have been removed between validation
+and now).
 
 Spawn the **same** `GENIE_ROOT/config/eco_agents/eco_fenets_runner.md` sub-agent complete mode uses,
 passing `FM_SESSION_DIR` (in place of `REF_DIR` for locating the FM session/`cmds`/`rpts`) and

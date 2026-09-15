@@ -84,14 +84,13 @@ All four inputs are **REQUIRED** — there are no defaults, including `mode`.
    `mode == simple`, this is the very next question — ask it via `AskUserQuestion` BEFORE asking
    anything about design inputs / input style / RTL paths:
    - `No (default, recommended)` — Step 2 is skipped; Step 3 uses structural cone tracing only (unchanged behavior).
-   - `Yes` — Step 2 runs. Requires a **separate** input, `FM_SESSION_DIR`: an absolute path to a TileBuilder directory containing an FM target whose `.cmd` reads the true pre-ECO baseline netlist (verified by content, not by name — see below; typically a PreEco-phase target like `FmEqvPreEcoSynthesizeVsPreEcoSynRtl`, but any target name qualifies if it genuinely reads the baseline). Required no matter which input style is picked in Q3 below — `FM_SESSION_DIR` is independent of where the RTL/netlist inputs come from; it may or may not be the same directory.
+   - `Yes` — Step 2 runs. Requires a **separate** input, `FM_SESSION_DIR`: an absolute path to a TileBuilder directory containing an FM target that has actually been run — verified by an existing `.fss` session file, not by target name (see below; typically a PreEco-phase target like `FmEqvPreEcoSynthesizeVsPreEcoSynRtl`, but any target name qualifies if its session exists). Required no matter which input style is picked in Q3 below — `FM_SESSION_DIR` is independent of where the RTL/netlist inputs come from; it may or may not be the same directory.
 
-   If `Yes`, validate `FM_SESSION_DIR` immediately, before proceeding to Q3. **Validation is
-   CONTENT-based, not name-based**: what matters is whether a target's `.cmd` actually reads the TRUE
-   pre-ECO baseline netlist (`FM_SESSION_DIR/data/PreEco/<Stage>.v[.gz]`), not whether its name
-   contains `PreEco`. (Proven on a real ECO: `FmEqvSynthesizeVsSynRtl` — a normal post-synthesis
-   target with no `PreEco` in its name — served `find_equivalent_nets` correctly once pointed at a
-   true baseline netlist; a name-substring check would have wrongly rejected it.)
+   If `Yes`, validate `FM_SESSION_DIR` immediately, before proceeding to Q3. **Validation is a session
+   EXISTENCE check, not a name or content check**: what matters is whether the target's FM session has
+   actually been run and can be reopened (e.g. via `TileBuilderIntFM <target_name>`) — evidenced by a
+   `<target_name>_{passed,failed}.fss` file under `rpts/<target_name>/<target_name>_runData/`. Pass or
+   fail doesn't matter, and neither does whether the name contains `PreEco`.
 
    **Step A — auto-detect (fast path, no extra question in the common case):**
    ```bash
@@ -101,37 +100,24 @@ All four inputs are **REQUIRED** — there are no defaults, including `mode`.
    This always returns *something* per active stage (comma-separated) — it falls back to canonical
    names like `FmEqvPreEcoSynthesizeVsPreEcoSynRtl` even when nothing real was found on disk.
 
-   **Step B — content-verify each detected name, per stage:**
+   **Step B — verify each detected name's session actually exists, per stage:**
    ```bash
    cd /home/abinbaba/eco_flow
-   python3 script/eco_scripts/eco_fm_targets.py --verify-content <FM_SESSION_DIR> <target_name>
+   python3 script/eco_scripts/eco_fm_targets.py --verify-session <FM_SESSION_DIR> <target_name>
    ```
-   Prints `RESULT=` one of `MATCH | MISMATCH | NO_CMD_FILE | NO_STAGE | NO_NETLIST_LINE | NO_BASELINE
-   | UNREADABLE`, plus the resolved `CMD_NETLIST=` / `BASELINE_NETLIST=` paths for messaging.
+   Prints `RESULT=` one of `MATCH | NO_STAGE | NO_FSS`, plus `FSS_PATH=` and `STATUS=passed|failed`
+   for messaging.
    - **`MATCH` for every active stage** → the common case (a genuine TileBuilder dir that already ran
-     real PreEco FM targets). Accept **silently — do not ask the user to name a target**. Record each
-     matched name into `PREECO_TARGETS`.
-   - **Anything else, for one or more stages** → fall back to Step C for just those stages.
+     the target at least once). Accept **silently — do not ask the user to name a target**. Record
+     each matched name into `PREECO_TARGETS`.
+   - **`NO_FSS` or `NO_STAGE`, for one or more stages** → fall back to Step C for just those stages.
 
    **Step C — manual override fallback (only entered when Step B fails for a stage):**
-   Tell the user plainly what went wrong for that stage, using `RESULT`:
-   - `NO_CMD_FILE` — no PreEco-phase target exists here for that stage; only non-PreEco targets found.
-   - `MISMATCH` — a target exists, but its `.cmd` reads a netlist that doesn't match the true baseline
-     (`CMD_NETLIST` vs `BASELINE_NETLIST`) — likely repointed elsewhere.
-   - `NO_BASELINE` — this directory has no `data/PreEco/<stage>.v[.gz]` snapshot. **This does NOT
-     necessarily mean fenets is impossible** — a tile several ECOs deep may never keep that snapshot,
-     even though a real baseline exists elsewhere (a `.preeco_bak`-style backup, a prior ECO's PostEco
-     netlist — check the target's `.cmd` for commented-out `read_verilog` lines referencing an earlier
-     ECO's output). Offer a THIRD option: **supply the true baseline netlist path directly**, then
-     re-run with `--baseline <path>`:
-     ```bash
-     python3 script/eco_scripts/eco_fm_targets.py --verify-content <FM_SESSION_DIR> <target_name> --baseline <path>
-     ```
-     Only a `MATCH` from this override run is accepted.
+   Tell the user plainly: no FM session has been run for `<target_name>` at `<stage>` — no
+   `<target_name>_{passed,failed}.fss` file exists under `rpts/<target_name>/<target_name>_runData/`.
    Then ask: a **different target name** to try (any name, PreEco-named or not), a **different
-   `FM_SESSION_DIR`**, a **baseline path override** (see `NO_BASELINE` above), or **skip fenets** for
-   that stage / entirely. Re-run Step B (with or without `--baseline`) on whatever is supplied; only
-   `MATCH` is accepted — loop until resolved or the user opts out.
+   `FM_SESSION_DIR`**, or **skip fenets** for that stage / entirely. Re-run Step B's `--verify-session`
+   on whatever name is supplied; only `MATCH` is accepted — loop until resolved or the user opts out.
 
    On success, record `RUN_FENETS=true`, `FM_SESSION_DIR=<path>`, `PREECO_TARGETS=<content-verified,
    comma-separated per-stage names>`. On `No`, or if the user opts out entirely in Step C, record
