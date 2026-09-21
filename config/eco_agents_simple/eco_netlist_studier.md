@@ -69,24 +69,55 @@ to clean those up.
 
 ## Polarity — MANDATORY (there is no fenets `(+)/(-)` to tell you)
 In complete mode Step 2 hands the studier FM-authoritative polarity (`(+)` = same, `(-)` =
-complement). Simple mode has none, so **before binding any resolved net as an input** (mux select,
-AND-enable, gate input, wire_swap old_net), determine whether it carries the signal or its
-**complement** using `eco_cone_trace.py polarity` — inversion-counting back to a known-good reference
-(the signal's **source register Q**, which is true-polarity by definition):
+complement). Simple mode has none, so **before binding ANY net as an input** (mux select,
+AND-enable, gate input, wire_swap old_net) determine whether it carries the signal or its
+**complement** — and this check is required **regardless of whether the net needed resolving**.
+A net found trivially (its bare RTL name still exists directly in the netlist — no resolution
+work at all) is **not automatically trustworthy**: P&R can insert a hierarchy-crossing inverter
+on a signal that crosses into another module while leaving the port name completely unchanged
+(confirmed on real silicon — JIRA-11233's `ReqPlr_p1[1]`/`[2]` kept their RTL name but silently
+flipped polarity at exactly this kind of boundary). So: **any operand that is a bare primary
+input of the current module gets this check too**, whether or not you had to resolve it.
+
+Run the check with `eco_cone_trace.py polarity`:
 ```bash
+# Same-module case (you already know the true reference net, e.g. a source register Q):
 python3 script/eco_scripts/eco_cone_trace.py polarity \
     --netlist <REF_DIR>/data/PreEco/<Stage>.v.gz --module <module> \
     --target <resolved_net> --ref <source_reg_Q_net>[,<other_true_ref>]
-# -> POLARITY=TRUE|INVERTED|UNDETERMINED inv=<n>
+
+# Primary-input / cross-module case (no known reference net — omit --ref, add --instance-scope):
+python3 script/eco_scripts/eco_cone_trace.py polarity \
+    --netlist <REF_DIR>/data/PreEco/<Stage>.v.gz --module <module> \
+    --target <net> --instance-scope "<scope, e.g. ARB/STGBUF>"
+# -> POLARITY=TRUE|INVERTED|UNDETERMINED inv=<n> reached=<terminal>
 ```
+The `--instance-scope` mode auto-hops into the actual parent instantiation whenever the walk
+dead-ends at a bare primary-input port (using the entry's own `instance_scope` field to pick the
+specific instantiation, not guessing when the module type appears more than once).
+
 Act on the result:
 - **TRUE** → use the net as-is.
 - **INVERTED** → the net carries the complement; either bind the un-inverted source, or add one
   `INV` (`n_eco_<jira>_*` output) and bind that — record it in the entry.
-- **UNDETERMINED** → the tracer could not prove it through a pure buffer/inverter chain. **STOP and
-  flag this change** (`polarity_undetermined` in the entry) — do NOT guess. Without FM to catch a
-  wrong-polarity insert, guessing is how simple mode silently corrupts a netlist. Re-derive the
-  correct reference net, or hand this change to complete mode.
+- **UNDETERMINED → do NOT stop here, investigate further.** The tool is intentionally
+  conservative (it refuses to guess through anything beyond a pure buffer/inverter chain, and
+  never trusts a real-gate terminal reached after crossing a module boundary) — that's a
+  starting point for you to dig deeper, not a final answer. Before flagging the change:
+  1. Run `eco_cone_trace.py cone --direction fanin --depth 0` from the `reached` net to enumerate
+     its **entire** upstream fan-in cone, and manually inspect it for a register anchor the
+     bounded walk couldn't safely commit to on its own.
+  2. Check for net-name collisions between uniquified module copies (`<module>` vs `<module>_0`,
+     or multiple instantiations of the same module type) — a coincidentally-shared local net name
+     across two different instances is a common reason a bounded trace stalls.
+  3. Cross-check against the manual verification patterns used in this session (e.g. counting
+     inverters by hand along the specific physical path, or an ad hoc `find_equivalent_nets`
+     query if an FM session happens to be available) to reach a confident conclusion.
+  4. If, after real investigation, you reach a confident TRUE/INVERTED conclusion, record it in
+     the entry along with the evidence trail (which register/path, how you ruled out ambiguity) —
+     treat this the same as a tool-confirmed result.
+  5. **Only if genuinely irreducible after this investigation** — flag `polarity_undetermined` in
+     the entry with what you tried and why it didn't resolve. Do not guess past this point.
 
 Do this **per stage** — polarity can differ across Synthesize/PrePlace/Route because P&R inserts
 inverter/buffer chains independently. Never carry a Synthesize polarity verdict to Route.

@@ -31,9 +31,17 @@ There is **no FM and no validator to catch a mistake** in simple mode. Correctne
 3. **Structural cone tracing** (replaces fenets) — resolve every RTL signal to its real gate-level
    net per stage, and its **polarity**, with `eco_cone_trace.py` (resolve / polarity / cone; built on
    the complete-gate-boundary parser). Polarity is inversion-counted back to the signal's source
-   register Q; an `UNDETERMINED` verdict means STOP, never guess (no FM to catch a wrong polarity).
-Be conservative: if a per-stage net or its polarity cannot be resolved, mark it and stop rather than
-guess — prefer punting the change to complete mode over a silent wrong insert.
+   register Q — **run this check on every operand, not just ones that needed resolving**: a bare
+   RTL-named signal found directly in the netlist is NOT automatically trustworthy, since P&R can
+   insert a hierarchy-crossing inverter across a module boundary while leaving the port name
+   unchanged (confirmed on real silicon — see `eco_netlist_studier.md`'s Polarity section for the
+   `--instance-scope` cross-module mode this requires). An `UNDETERMINED` verdict is a starting
+   point for further investigation, **not an automatic stop** — see `eco_netlist_studier.md` for
+   the required deeper-tracing steps before a change may be flagged `polarity_undetermined`.
+Be conservative: if, after genuine further investigation, a per-stage net or its polarity truly
+cannot be resolved, mark it and stop rather than guess — prefer punting the change to complete mode
+over a silent wrong insert. But do not stop at the first `UNDETERMINED` without that investigation —
+that's the tool being conservative, not proof the polarity is unrecoverable.
 
 4. **Script-bug self-fix — simple mode is for EVALUATION, so do NOT hard-stop on a *tooling* bug.**
    The whole point of simple mode is to see, end-to-end, *what the ECO does* — a hard stop produces no
@@ -227,15 +235,20 @@ its own doc, the verifier then uses it at the same priority tier the complete ve
 2 and 10, falling back to the structural ladder only for entries it doesn't cover. If absent, it runs
 the complete verifier's enrichment checks **structurally** (no fenets) as before: per-stage net
 resolution (`eco_cone_trace.py resolve` / `eco_resolve_synth_internal.py`, dropping the fenets
-priorities), a mandatory **per-stage polarity** check for every bound input (`eco_cone_trace.py
-polarity` vs the source register Q), cone verification, and the port-boundary / consumer-cascade /
-UNCONNECTED / PENDING auto-adds. It writes the enriched study back + `<TAG>_eco_step3_netlist_verify.rpt`.
+priorities), a mandatory **per-stage polarity** check for every bound input — including bare
+primary inputs that needed no resolving (`eco_cone_trace.py polarity`, cross-module `--instance-scope`
+mode when there's no known reference net) — with genuine further tracing on any `UNDETERMINED`
+result per `eco_netlist_studier.md`'s Polarity section before it may be recorded as
+`polarity_undetermined`, cone verification, and the port-boundary / consumer-cascade / UNCONNECTED /
+PENDING auto-adds. It writes the enriched study back + `<TAG>_eco_step3_netlist_verify.rpt`.
 Wait for its result, then **relay:**
 `"Step 3c OK — verifier enriched study, <N> auto-adds, flags: <none|list>. Next: Step 4 apply."`
 
 **CHECKPOINT:** `<TAG>_eco_preeco_study.json` has entries for ≥1 stage, and BOTH the agent-authored
 `<TAG>_eco_step3_netlist_study.rpt` (what the gate-level ECO does) and `<TAG>_eco_step3_netlist_verify.rpt` exist. If
-the verifier flagged any `NET-ABSENT-IN-STAGE`, `UNRESOLVABLE`, or `polarity_undetermined` entry →
+the verifier flagged any `NET-ABSENT-IN-STAGE`, `UNRESOLVABLE`, or `polarity_undetermined` entry
+(meaning: genuinely irreducible even after the deeper-tracing investigation `eco_netlist_studier.md`
+requires — not just the tool's first-pass conservative result) →
 **STOP and relay** what completed + the exact flagged entries:
 `"Step 3 STOPPED — verifier flagged <entry>: <NET-ABSENT/polarity_undetermined>. Completed Steps 1,
 3-pre, 3a, 3b, 3c; study + both step3 RPTs written under <AI_ECO_FLOW_DIR>. Punt the flagged change
