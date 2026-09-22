@@ -38,6 +38,12 @@ There is **no FM and no validator to catch a mistake** in simple mode. Correctne
    `--instance-scope` cross-module mode this requires). An `UNDETERMINED` verdict is a starting
    point for further investigation, **not an automatic stop** — see `eco_netlist_studier.md` for
    the required deeper-tracing steps before a change may be flagged `polarity_undetermined`.
+   **"Further investigation" means tracing to an actual register or genuinely irreducible
+   gate — it does NOT mean treating the tool's partial/incomplete inversion count as a
+   conclusion** (confirmed real failure: "inv=0 so far, consistent with TRUE" on a walk that
+   stopped at a cross-module buffer let a genuinely inverted signal through undetected). A
+   verdict is only valid once the specific terminal register/gate is named and the complete
+   count to reach it is shown.
 Be conservative: if, after genuine further investigation, a per-stage net or its polarity truly
 cannot be resolved, mark it and stop rather than guess — prefer punting the change to complete mode
 over a silent wrong insert. But do not stop at the first `UNDETERMINED` without that investigation —

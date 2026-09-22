@@ -67,15 +67,24 @@ present stage when you can resolve it; if a *present* P&R stage cannot be resolv
 leave a `NET-ABSENT-IN-STAGE` marker — the orchestrator's Step 3c runs `eco_resolve_synth_internal.py`
 to clean those up.
 
-## Polarity — MANDATORY (there is no fenets `(+)/(-)` to tell you)
+## Polarity — MANDATORY (there is no fenets `(+)/(-)` to tell you, UNLESS Step 2 ran)
 In complete mode Step 2 hands the studier FM-authoritative polarity (`(+)` = same, `(-)` =
-complement). Simple mode has none, so **before binding ANY net as an input** (mux select,
+complement). Simple mode normally has none — **except when the optional Step 2 (fenets) ran and
+a rename_map exists** (see the section above). In that case, **check the rename_map FIRST, before
+running any of the manual `eco_cone_trace.py polarity` steps below**: if the entry for this net
+has `<stage>_polarity == "INVERTED"` or `actual_wire_<stage>`, that is FM's own authoritative,
+already-proven answer — the golden reference — and OVERRIDES a manual structural trace. Do not
+re-derive polarity by hand for a net the rename_map already resolved; that's redundant work that
+could disagree with FM for no good reason. Only fall through to the manual steps below when the
+rename_map has neither field for this net (including when Step 2 didn't run at all).
+
+Before binding ANY net as an input (mux select,
 AND-enable, gate input, wire_swap old_net) determine whether it carries the signal or its
 **complement** — and this check is required **regardless of whether the net needed resolving**.
 A net found trivially (its bare RTL name still exists directly in the netlist — no resolution
 work at all) is **not automatically trustworthy**: P&R can insert a hierarchy-crossing inverter
 on a signal that crosses into another module while leaving the port name completely unchanged
-(confirmed on real silicon — JIRA-11233's `ReqPlr_p1[1]`/`[2]` kept their RTL name but silently
+(confirmed on real silicon — a cross-module signal kept its RTL name but silently
 flipped polarity at exactly this kind of boundary). So: **any operand that is a bare primary
 input of the current module gets this check too**, whether or not you had to resolve it.
 
@@ -89,7 +98,7 @@ python3 script/eco_scripts/eco_cone_trace.py polarity \
 # Primary-input / cross-module case (no known reference net — omit --ref, add --instance-scope):
 python3 script/eco_scripts/eco_cone_trace.py polarity \
     --netlist <REF_DIR>/data/PreEco/<Stage>.v.gz --module <module> \
-    --target <net> --instance-scope "<scope, e.g. ARB/STGBUF>"
+    --target <net> --instance-scope "<scope, e.g. PARENT/CHILD>"
 # -> POLARITY=TRUE|INVERTED|UNDETERMINED inv=<n> reached=<terminal>
 ```
 The `--instance-scope` mode auto-hops into the actual parent instantiation whenever the walk
@@ -104,20 +113,39 @@ Act on the result:
   conservative (it refuses to guess through anything beyond a pure buffer/inverter chain, and
   never trusts a real-gate terminal reached after crossing a module boundary) — that's a
   starting point for you to dig deeper, not a final answer. Before flagging the change:
+
+  **FORBIDDEN — do not do this (a confirmed real failure mode):** treating the `inv=<n>` count
+  the tool accumulated *up to the point it gave up* as if it were evidence of anything. An
+  `UNDETERMINED` verdict means the walk did NOT reach a trustworthy terminal — the partial
+  inversion count is meaningless on its own, because there is no way to know how many more
+  inversions exist beyond the point the walk stopped. Writing a conclusion like "inv=0 so far,
+  consistent with TRUE" or "EVEN so far" is **not a real investigation** — it silently reproduces
+  exactly the false-negative this tool's conservatism exists to prevent (confirmed real: this
+  reasoning pattern once let a genuinely inverted signal go through as "TRUE" undetected). Do not
+  round an incomplete trace up to a verdict just because it "looks" consistent so far.
+
+  What a REAL investigation requires instead:
   1. Run `eco_cone_trace.py cone --direction fanin --depth 0` from the `reached` net to enumerate
      its **entire** upstream fan-in cone, and manually inspect it for a register anchor the
      bounded walk couldn't safely commit to on its own.
   2. Check for net-name collisions between uniquified module copies (`<module>` vs `<module>_0`,
      or multiple instantiations of the same module type) — a coincidentally-shared local net name
      across two different instances is a common reason a bounded trace stalls.
-  3. Cross-check against the manual verification patterns used in this session (e.g. counting
-     inverters by hand along the specific physical path, or an ad hoc `find_equivalent_nets`
-     query if an FM session happens to be available) to reach a confident conclusion.
-  4. If, after real investigation, you reach a confident TRUE/INVERTED conclusion, record it in
-     the entry along with the evidence trail (which register/path, how you ruled out ambiguity) —
-     treat this the same as a tool-confirmed result.
-  5. **Only if genuinely irreducible after this investigation** — flag `polarity_undetermined` in
-     the entry with what you tried and why it didn't resolve. Do not guess past this point.
+  3. **Continue the trace by hand, cell by cell, all the way to an actual register (DFF Q/QN) or
+     a genuinely irreducible real logic gate** — not just past the one buffer the tool stopped
+     at. A conclusion is only valid once you can name the specific register or gate you reached
+     and show the complete inverter count along the ENTIRE path to it, not a partial count to an
+     intermediate point.
+  4. Cross-check against real evidence when available (an ad hoc `find_equivalent_nets` query if
+     an FM session happens to be reachable) to corroborate the manual trace — do not treat a
+     manual trace as self-certifying if a way to independently confirm it exists.
+  5. If, after a REAL (complete, terminal-anchored) investigation, you reach a confident
+     TRUE/INVERTED conclusion, record it in the entry along with the full evidence trail (the
+     exact register/gate reached, the complete inverter count to get there, how you ruled out
+     ambiguity) — treat this the same as a tool-confirmed result.
+  6. **Only if genuinely irreducible after this investigation** — flag `polarity_undetermined` in
+     the entry with what you tried and why it didn't resolve. Do not guess past this point, and do
+     not settle for a partial trace dressed up as a conclusion.
 
 Do this **per stage** — polarity can differ across Synthesize/PrePlace/Route because P&R inserts
 inverter/buffer chains independently. Never carry a Synthesize polarity verdict to Route.
