@@ -248,19 +248,34 @@ result per `eco_netlist_studier.md`'s Polarity section before it may be recorded
 `polarity_undetermined`, cone verification, and the port-boundary / consumer-cascade / UNCONNECTED /
 PENDING auto-adds. It writes the enriched study back + `<TAG>_eco_step3_netlist_verify.rpt`.
 Wait for its result, then **relay:**
-`"Step 3c OK — verifier enriched study, <N> auto-adds, flags: <none|list>. Next: Step 4 apply."`
+`"Step 3c OK — verifier enriched study, <N> auto-adds, flags: <none|list>. Next: 3c2 cross-module polarity."`
+
+**3c2. MANDATORY cross-module polarity check (Check 68, `eco_netlist_verifier.md` item 12 — no
+FM/fenets, not `eco_validate_step3.py`).** Run once, right after 3c:
+```bash
+python3 script/eco_scripts/eco_check_cross_module_polarity.py \
+    --study <AI_ECO_FLOW_DIR>/<TAG>_eco_preeco_study.json --ref-dir <REF_DIR> --tag <TAG> \
+    --output <AI_ECO_FLOW_DIR>/<TAG>_eco_cross_module_polarity.json
+```
+`CRITICAL/...-INVERTED` = hard stop (fix the gate, re-run until clean, or punt to complete mode).
+`MEDIUM/...-UNVERIFIED` = non-blocking, list in the Step 3 RPT flags.
+
+Relay: `"Step 3c2 OK — cross-module polarity check clean."` or `"Step 3c2 — <C> CRITICAL / <M> MEDIUM
+findings (see <TAG>_eco_cross_module_polarity.json)."`
 
 **CHECKPOINT:** `<TAG>_eco_preeco_study.json` has entries for ≥1 stage, and BOTH the agent-authored
 `<TAG>_eco_step3_netlist_study.rpt` (what the gate-level ECO does) and `<TAG>_eco_step3_netlist_verify.rpt` exist. If
 the verifier flagged any `NET-ABSENT-IN-STAGE`, `UNRESOLVABLE`, or `polarity_undetermined` entry
 (meaning: genuinely irreducible even after the deeper-tracing investigation `eco_netlist_studier.md`
-requires — not just the tool's first-pass conservative result) →
+requires — not just the tool's first-pass conservative result), OR 3c2 reported any unresolved
+`CRITICAL/68-CROSS-MODULE-PRIMARY-INPUT-INVERTED` finding →
 **STOP and relay** what completed + the exact flagged entries:
-`"Step 3 STOPPED — verifier flagged <entry>: <NET-ABSENT/polarity_undetermined>. Completed Steps 1,
-3-pre, 3a, 3b, 3c; study + both step3 RPTs written under <AI_ECO_FLOW_DIR>. Punt the flagged change
-to complete mode."` (simple mode must not apply an unresolved/ambiguous study.) **Do NOT run
-`eco_validate_step3.py` or `eco_functional_precheck.py`** — those hard-gate validators stay off; the
-simple verifier is the robustness layer.
+`"Step 3 STOPPED — verifier flagged <entry>: <NET-ABSENT/polarity_undetermined/68-CROSS-MODULE-
+PRIMARY-INPUT-INVERTED>. Completed Steps 1, 3-pre, 3a, 3b, 3c, 3c2; study + both step3 RPTs written
+under <AI_ECO_FLOW_DIR>. Punt the flagged change to complete mode."` (simple mode must not apply an
+unresolved/ambiguous study.) **Do NOT run `eco_validate_step3.py` or `eco_functional_precheck.py`**
+(those hard-gate validators, most of which assume fenets data, stay off; the simple verifier +
+`eco_check_cross_module_polarity.py` are the robustness layer).
 
 ---
 

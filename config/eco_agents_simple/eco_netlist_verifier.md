@@ -173,6 +173,20 @@ it is absent by design, not unresolved, and must NOT stop the flow.
    - **Why:** Referencing `net[0]` before its vector declaration causes Verilog to implicitly treat `net` as a 1-bit scalar,
      causing Formality LEC `read_verilog` to crash with `Error: Indexing into non-array '...' is not allowed (FM-599)`.
 
+12. **Check 68 (MANDATORY — Cross-Module Primary-Input Polarity).** The `eco_cone_trace.py polarity`
+   call in #2 only walks a single module — it misses a leaf that is itself a bare primary-input port
+   of its module, where P&R can insert an odd inverter count between the true source (a different
+   module) and that port without changing the port name. Run once, after the study is enriched:
+   ```bash
+   python3 script/eco_scripts/eco_check_cross_module_polarity.py \
+       --study <AI_ECO_FLOW_DIR>/<TAG>_eco_preeco_study.json --ref-dir <REF_DIR> --tag <TAG> \
+       --output <AI_ECO_FLOW_DIR>/<TAG>_eco_cross_module_polarity.json
+   ```
+   No FM/fenets needed — pure structural tracing across module boundaries (`eco_structural_polarity.py`,
+   the same engine complete mode's Check 68 uses). `CRITICAL/...-INVERTED` = hard stop for that leaf
+   (fix the gate, e.g. `XNOR2`→`XOR2`, before Step 4). `MEDIUM/...-UNVERIFIED` = non-blocking, but must
+   be listed in `<TAG>_eco_step3_netlist_verify.rpt`.
+
 ## Keep unchanged (pure structural — apply exactly as the complete verifier)
 Check 1 (GAP-15 and_term strategy, from `<TAG>_eco_and_term_port_check.json`), Check 4 (GAP-14 wire
 decl — **but see substitution #6: a new bus-bit gate output needs an explicit `wire [MSB:0]` in its
@@ -204,10 +218,15 @@ SUMMARY: <N> new gates, <M> rewires, <P> port changes across Synthesize/PrePlace
 [PrePlace] ...   [Route] ...
 
 RESOLUTION NOTES: <any nets resolved via driver-trace / neighbour-DFF>
-FLAGS: <NET-ABSENT / UNRESOLVABLE / polarity_undetermined entries, or "none">
+FLAGS: <NET-ABSENT / UNRESOLVABLE / polarity_undetermined / 68-CROSS-MODULE-PRIMARY-INPUT-INVERTED
+        (CRITICAL) / 68-CROSS-MODULE-PRIMARY-INPUT-UNVERIFIED (MEDIUM, non-blocking) entries, or "none">
 ```
 Also keep the short `<TAG>_eco_step3_netlist_verify.rpt` (what you resolved / auto-added / flagged).
-If any entry is left `NET-ABSENT-IN-STAGE`, `UNRESOLVABLE`, or `polarity_undetermined`, list them
+If any entry is left `NET-ABSENT-IN-STAGE`, `UNRESOLVABLE`, `polarity_undetermined`, or has an
+unresolved `CRITICAL/68-CROSS-MODULE-PRIMARY-INPUT-INVERTED` finding from Check 68 above, list them
 prominently in BOTH — the orchestrator STOPS on those (simple mode must not apply an
 unresolved/ambiguous study). Do NOT run `eco_validate_step3.py` or `eco_functional_precheck.py`
-(those hard-gate validators stay off in simple mode); you are the robustness layer.
+(those hard-gate validators — dozens of checks assuming fenets data — stay off in simple mode); you
+are the robustness layer. `eco_check_cross_module_polarity.py` (Check 68, above) is the ONE
+exception: it is a lightweight, self-contained, fenets-free structural script, not the full
+validator, and running it is MANDATORY, not optional.
