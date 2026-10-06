@@ -193,8 +193,13 @@ it is absent by design, not unresolved, and must NOT stop the flow.
    another, independently-inverted operand this check cannot see, AND the structural walk itself can
    anchor to the wrong one of several equivalent registers in a design (confirmed on a real design: a
    net was confidently reported INVERTED by reaching a real but non-canonical reset-tree register,
-   while the rename map on that same net showed TRUE). A rename-map-sourced finding is far more
-   reliable than a structural-only one, but still not an automatic hard stop. List all findings
+   while the rename map on that same net showed TRUE — root cause: that register's own data-input
+   traced back to a primary input PORT of the netlist's own top module, i.e. its true value is set by
+   something outside this netlist slice; the tracer now detects a confident register terminal whose
+   D-input dead-ends at a top-level boundary port and downgrades it to UNVERIFIED instead of asserting
+   a possibly-wrong verdict — a real improvement, not a complete guarantee against every ambiguity). A
+   rename-map-sourced finding is far more reliable than a structural-only one, but still not an
+   automatic hard stop. List all findings
    (`REVIEW` or `ADVISORY`) in `<TAG>_eco_step3_netlist_verify.rpt` for human review, but always
    proceed to Step 4 regardless.
 

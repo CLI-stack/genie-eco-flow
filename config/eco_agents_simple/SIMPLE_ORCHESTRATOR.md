@@ -268,6 +268,14 @@ inverted operand can be legitimately compensated by another, independently-inver
 check cannot see, AND the structural walk itself can anchor to the wrong one of several equivalent
 registers in a design (confirmed on a real design: it confidently reported a net INVERTED by reaching
 a real but non-canonical reset-tree register, when the real rename map on the same net showed TRUE).
+Root-caused: the wrong register was a genuine, unambiguous register in the netlist, but its own
+data-input traced back to a primary input PORT of the netlist's own top module — i.e. a register whose
+true value is set by something outside this netlist slice entirely (a different tile/hierarchy branch
+not included in the given netlist). The tracer now detects this specific case (a confident register
+terminal whose D-input dead-ends at a top-level boundary port) and downgrades it to UNVERIFIED instead
+of asserting a possibly-wrong TRUE/INVERTED — but a register fully contained within the visible
+netlist can still legitimately be the wrong one of several real equivalents if the ambiguity isn't a
+boundary-port one; this class of mitigation is a confidence improvement, not a complete guarantee.
 List every `REVIEW`/`ADVISORY` finding in the Step 3 RPT's INFO section for human review, but always
 continue to Step 4 regardless of what it reports.
 
