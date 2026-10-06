@@ -177,19 +177,26 @@ it is absent by design, not unresolved, and must NOT stop the flow.
    polarity` call in #2 only walks a single module — it misses a leaf that is itself a bare
    primary-input port of its module, where P&R can insert an odd inverter count between the true
    source (a different module) and that port without changing the port name. Run once, after the
-   study is enriched:
+   study is enriched, passing the fenets rename map (if Step 2 ran) as the GOLDEN REFERENCE:
    ```bash
+   RM=<AI_ECO_FLOW_DIR>/<TAG>_eco_fenets_rename_map.json
+   [ -f "$RM" ] && RM_FLAG="--rename-map $RM" || RM_FLAG=""
    python3 script/eco_scripts/eco_check_cross_module_polarity.py \
-       --study <AI_ECO_FLOW_DIR>/<TAG>_eco_preeco_study.json --ref-dir <REF_DIR> --tag <TAG> \
+       --study <AI_ECO_FLOW_DIR>/<TAG>_eco_preeco_study.json --ref-dir <REF_DIR> --tag <TAG> $RM_FLAG \
        --output <AI_ECO_FLOW_DIR>/<TAG>_eco_cross_module_polarity.json
    ```
-   No FM/fenets needed — pure structural tracing across module boundaries
-   (`eco_structural_polarity.py`). **Never treat any finding here as a hard stop** — an inverted
-   operand can be legitimately compensated by another, independently-inverted operand this
-   structural-only check cannot see (confirmed to false-positive on an already-correct,
-   Formality-verified-passing design). Complete mode does not run this check at all; its fenets
-   rename map already resolves this correctly. List all findings (`CRITICAL` or `MEDIUM`) in
-   `<TAG>_eco_step3_netlist_verify.rpt` for human review, but always proceed to Step 4 regardless.
+   The rename map, when present, is checked FIRST for every candidate net — real Formality
+   equivalence data beats structural tracing every time. Structural tracing
+   (`eco_structural_polarity.py`) is the fallback when no rename map exists (or doesn't cover a
+   given net — e.g. a brand-new ECO-created signal fenets never queried). **Never treat any finding
+   here as a hard stop** — a structural-only inverted verdict can be legitimately compensated by
+   another, independently-inverted operand this check cannot see, AND the structural walk itself can
+   anchor to the wrong one of several equivalent registers in a design (confirmed on a real design: a
+   net was confidently reported INVERTED by reaching a real but non-canonical reset-tree register,
+   while the rename map on that same net showed TRUE). A rename-map-sourced finding is far more
+   reliable than a structural-only one, but still not an automatic hard stop. List all findings
+   (`REVIEW` or `ADVISORY`) in `<TAG>_eco_step3_netlist_verify.rpt` for human review, but always
+   proceed to Step 4 regardless.
 
 ## Keep unchanged (pure structural — apply exactly as the complete verifier)
 Check 1 (GAP-15 and_term strategy, from `<TAG>_eco_and_term_port_check.json`), Check 4 (GAP-14 wire

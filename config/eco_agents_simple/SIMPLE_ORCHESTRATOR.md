@@ -250,20 +250,26 @@ PENDING auto-adds. It writes the enriched study back + `<TAG>_eco_step3_netlist_
 Wait for its result, then **relay:**
 `"Step 3c OK — verifier enriched study, <N> auto-adds, flags: <none|list>. Next: 3c2 cross-module polarity."`
 
-**3c2. MANDATORY cross-module polarity check (Check 68, `eco_netlist_verifier.md` item 12 — no
-FM/fenets, not `eco_validate_step3.py`, INFORMATIONAL ONLY — never blocks Step 4).** Run once, right
-after 3c:
+**3c2. MANDATORY cross-module polarity check (Check 68, `eco_netlist_verifier.md` item 12 — not
+`eco_validate_step3.py`, INFORMATIONAL ONLY — never blocks Step 4).** Run once, right after 3c.
+**Check whether `<AI_ECO_FLOW_DIR>/<TAG>_eco_fenets_rename_map.json` exists first** (Step 2 ran and
+succeeded) — if so, pass it as `--rename-map`:
 ```bash
+RM=<AI_ECO_FLOW_DIR>/<TAG>_eco_fenets_rename_map.json
+if [ -f "$RM" ]; then RM_FLAG="--rename-map $RM"; else RM_FLAG=""; fi
 python3 script/eco_scripts/eco_check_cross_module_polarity.py \
-    --study <AI_ECO_FLOW_DIR>/<TAG>_eco_preeco_study.json --ref-dir <REF_DIR> --tag <TAG> \
+    --study <AI_ECO_FLOW_DIR>/<TAG>_eco_preeco_study.json --ref-dir <REF_DIR> --tag <TAG> $RM_FLAG \
     --output <AI_ECO_FLOW_DIR>/<TAG>_eco_cross_module_polarity.json
 ```
-This is a hint, not a gate: an inverted operand can be legitimately compensated by another,
-independently-inverted operand this structural-only check cannot see (it has already false-positived
-on an already-correct, Formality-verified-passing design — complete mode's fenets rename map resolves
-this class of issue correctly, which is why this check does not exist there at all). List every
-`CRITICAL`/`MEDIUM` finding in the Step 3 RPT's INFO section for human review, but always continue to
-Step 4 regardless of what it reports.
+When the rename map is present, it is the GOLDEN REFERENCE — checked first for every candidate net,
+real Formality equivalence data, far more reliable than structural tracing. When absent (the default,
+no fenets), structural tracing is the only signal available, and it is a hint, not a gate: an
+inverted operand can be legitimately compensated by another, independently-inverted operand this
+check cannot see, AND the structural walk itself can anchor to the wrong one of several equivalent
+registers in a design (confirmed on a real design: it confidently reported a net INVERTED by reaching
+a real but non-canonical reset-tree register, when the real rename map on the same net showed TRUE).
+List every `REVIEW`/`ADVISORY` finding in the Step 3 RPT's INFO section for human review, but always
+continue to Step 4 regardless of what it reports.
 
 Relay: `"Step 3c2 OK — cross-module polarity check clean."` or `"Step 3c2 — <C>/<M> informational
 findings (see <TAG>_eco_cross_module_polarity.json), continuing."`
