@@ -251,22 +251,49 @@ Wait for its result, then **relay:**
 `"Step 3c OK — verifier enriched study, <N> auto-adds, flags: <none|list>. Next: 3c2 cross-module polarity."`
 
 **3c2. MANDATORY cross-module polarity check (Check 68, `eco_netlist_verifier.md` item 12 — no
-FM/fenets, not `eco_validate_step3.py`, INFORMATIONAL ONLY — never blocks Step 4).** Run once, right
-after 3c:
+FM/fenets, not `eco_validate_step3.py`, NEVER blocks Step 4 — but EVERY finding MUST be investigated,
+not just logged).** Run once, right after 3c:
 ```bash
 python3 script/eco_scripts/eco_check_cross_module_polarity.py \
     --study <AI_ECO_FLOW_DIR>/<TAG>_eco_preeco_study.json --ref-dir <REF_DIR> --tag <TAG> \
     --output <AI_ECO_FLOW_DIR>/<TAG>_eco_cross_module_polarity.json
 ```
-This is a hint, not a gate: an inverted operand can be legitimately compensated by another,
-independently-inverted operand this structural-only check cannot see (it has already false-positived
-on an already-correct, Formality-verified-passing design — complete mode's fenets rename map resolves
-this class of issue correctly, which is why this check does not exist there at all). List every
-`CRITICAL`/`MEDIUM` finding in the Step 3 RPT's INFO section for human review, but always continue to
-Step 4 regardless of what it reports.
+This check cannot always prove an inverted operand is a real defect by itself — an inverted operand
+can be legitimately compensated by another, independently-inverted operand this structural-only check
+cannot see (confirmed to false-positive this way on an already-correct, Formality-verified-passing
+design). That is NOT a license to skip investigating findings — a real such bug (a fresh single-input
+INV re-inverting an already cross-module-inverted bare name, silently defeating the feature it was
+meant to implement) was confirmed by real Formality failure after being dismissed here without
+investigation. **Non-blocking means the flow never STOPS for this check — it does not mean findings go
+uninvestigated.**
 
-Relay: `"Step 3c2 OK — cross-module polarity check clean."` or `"Step 3c2 — <C>/<M> informational
-findings (see <TAG>_eco_cross_module_polarity.json), continuing."`
+For **every** `REVIEW`/`ADVISORY` finding, before writing the Step 3 RPT:
+1. **`...-SINGLE-INPUT-CONFIRMED` findings** (the flagged gate has exactly one input pin, so no other
+   operand could possibly compensate — this is a confirmed fact about the gate's output polarity, not
+   a maybe): identify the flagged gate's real consumer and what polarity RTL requires there (check the
+   RTL diff / the entry's own `reason` field for the intended boolean relationship). If the gate's
+   proven output polarity doesn't match what the consumer needs, **fix it now**: either remove the
+   redundant gate and rewire the consumer to the original (already-correctly-polarized) net directly,
+   or correct the gate between INV/BUF so its output matches what's needed — whichever the consumer's
+   actual logic calls for (do not assume removal is always right; verify against the consumer). Record
+   the fix as `LOGIC-SELF-FIX: <gate> — <wrong polarity> → <correction>` in the Step 3 RPT, the same way
+   `SCRIPT-SELF-FIX` is recorded for tooling bugs — this is a logic bug in the ECO's own output, not a
+   tooling bug, but it gets the same must-record-and-continue treatment. After fixing, re-run 3b's
+   affected emitter step(s) or directly patch the study JSON and re-validate the entry's cone before
+   proceeding.
+2. **Plain `REVIEW`/`ADVISORY` findings** (multi-input gate, or origin untraceable): attempt the
+   recomputation the finding's own text describes — trace every other input pin's real polarity (via
+   `eco_cone_trace.py polarity` or by hand, the same structural methods used elsewhere in this doc) and
+   build/compare the gate's actual realized function against RTL intent. If you confirm a real defect,
+   fix it the same way as above and record `LOGIC-SELF-FIX`. If you confirm it's a false positive
+   (compensated elsewhere), record `LOGIC-REVIEW-DISMISSED: <gate> — <reasoning>` in the Step 3 RPT. If
+   genuinely inconclusive after real effort (not a shortcut), record
+   `LOGIC-REVIEW-INCONCLUSIVE: <gate> — <what was tried, why it's unresolved>` and continue — still
+   never a stop condition, but never silently skipped either.
+
+Relay: `"Step 3c2 OK — cross-module polarity check clean."` or `"Step 3c2 — investigated <N> findings:
+<F> fixed, <D> dismissed (false positive), <I> inconclusive — see Step 3 RPT and
+<TAG>_eco_cross_module_polarity.json."`
 
 **CHECKPOINT:** `<TAG>_eco_preeco_study.json` has entries for ≥1 stage, and BOTH the agent-authored
 `<TAG>_eco_step3_netlist_study.rpt` (what the gate-level ECO does) and `<TAG>_eco_step3_netlist_verify.rpt` exist. If

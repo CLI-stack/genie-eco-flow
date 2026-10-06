@@ -173,23 +173,38 @@ it is absent by design, not unresolved, and must NOT stop the flow.
    - **Why:** Referencing `net[0]` before its vector declaration causes Verilog to implicitly treat `net` as a 1-bit scalar,
      causing Formality LEC `read_verilog` to crash with `Error: Indexing into non-array '...' is not allowed (FM-599)`.
 
-12. **Check 68 (INFORMATIONAL ONLY — Cross-Module Primary-Input Polarity).** The `eco_cone_trace.py
-   polarity` call in #2 only walks a single module — it misses a leaf that is itself a bare
-   primary-input port of its module, where P&R can insert an odd inverter count between the true
-   source (a different module) and that port without changing the port name. Run once, after the
-   study is enriched:
+12. **Check 68 (NEVER a hard stop — but EVERY finding MUST be investigated, not just logged —
+   Cross-Module Primary-Input Polarity).** The `eco_cone_trace.py polarity` call in #2 only walks a
+   single module — it misses a leaf that is itself a bare primary-input port of its module, where
+   P&R can insert an odd inverter count between the true source (a different module) and that port
+   without changing the port name. Run once, after the study is enriched:
    ```bash
    python3 script/eco_scripts/eco_check_cross_module_polarity.py \
        --study <AI_ECO_FLOW_DIR>/<TAG>_eco_preeco_study.json --ref-dir <REF_DIR> --tag <TAG> \
        --output <AI_ECO_FLOW_DIR>/<TAG>_eco_cross_module_polarity.json
    ```
    No FM/fenets needed — pure structural tracing across module boundaries
-   (`eco_structural_polarity.py`). **Never treat any finding here as a hard stop** — an inverted
-   operand can be legitimately compensated by another, independently-inverted operand this
-   structural-only check cannot see (confirmed to false-positive on an already-correct,
-   Formality-verified-passing design). Complete mode does not run this check at all; its fenets
-   rename map already resolves this correctly. List all findings (`CRITICAL` or `MEDIUM`) in
-   `<TAG>_eco_step3_netlist_verify.rpt` for human review, but always proceed to Step 4 regardless.
+   (`eco_structural_polarity.py`). Complete mode does not run this check at all; its fenets rename
+   map already resolves this correctly.
+
+   **`...-SINGLE-INPUT-CONFIRMED` findings** (the flagged gate has exactly one input pin, so no other
+   operand could possibly compensate — a confirmed fact, not a maybe): identify the consumer and what
+   polarity RTL requires there, then fix now — remove the redundant gate and wire the consumer to the
+   original net directly, or correct INV/BUF, whichever the consumer needs. Record
+   `LOGIC-SELF-FIX: <gate> — <wrong> → <correction>` in `<TAG>_eco_step3_netlist_verify.rpt`. (A real
+   instance of exactly this pattern — a fresh single-input INV re-inverting an already cross-module-
+   inverted bare name — silently defeated an ECO's entire feature and was only caught by a real
+   Formality failure after being wrongly dismissed here without investigation; do not repeat that.)
+
+   **Plain `REVIEW`/`ADVISORY` findings** (multi-input gate, or origin untraceable): attempt the
+   recomputation the finding's own text requires (trace every other input pin's real polarity, build
+   the gate's actual realized function, compare against RTL intent) before concluding anything. Fix and
+   record `LOGIC-SELF-FIX` if confirmed real; record `LOGIC-REVIEW-DISMISSED: <gate> — <reasoning>` if
+   confirmed a false positive; record `LOGIC-REVIEW-INCONCLUSIVE: <gate> — <what was tried>` if
+   genuinely unresolved after real effort. Never silently skip a finding.
+
+   None of this ever stops Step 4 — always proceed regardless of outcome — but every finding must end
+   up in one of: fixed, dismissed-with-reasoning, or inconclusive-with-reasoning, never un-investigated.
 
 ## Keep unchanged (pure structural — apply exactly as the complete verifier)
 Check 1 (GAP-15 and_term strategy, from `<TAG>_eco_and_term_port_check.json`), Check 4 (GAP-14 wire
@@ -223,15 +238,19 @@ SUMMARY: <N> new gates, <M> rewires, <P> port changes across Synthesize/PrePlace
 
 RESOLUTION NOTES: <any nets resolved via driver-trace / neighbour-DFF>
 FLAGS: <NET-ABSENT / UNRESOLVABLE / polarity_undetermined entries, or "none">
-INFO (non-blocking): <68-CROSS-MODULE-PRIMARY-INPUT-INVERTED/UNVERIFIED findings from Check 68, or "none">
+CHECK-68 (non-blocking, every finding investigated — never just logged):
+  LOGIC-SELF-FIX: <gate> — <wrong polarity> -> <correction>, or "none"
+  LOGIC-REVIEW-DISMISSED: <gate> — <false-positive reasoning>, or "none"
+  LOGIC-REVIEW-INCONCLUSIVE: <gate> — <what was tried>, or "none"
 ```
 Also keep the short `<TAG>_eco_step3_netlist_verify.rpt` (what you resolved / auto-added / flagged).
 If any entry is left `NET-ABSENT-IN-STAGE`, `UNRESOLVABLE`, or `polarity_undetermined`, list them
 prominently in BOTH — the orchestrator STOPS on those (simple mode must not apply an
-unresolved/ambiguous study). Check 68's findings are listed in the INFO section for human review but
-never stop the flow (see item 12 — this structural-only check can false-positive on already-correct
-designs). Do NOT run `eco_validate_step3.py` or `eco_functional_precheck.py` (those hard-gate
-validators — dozens of checks assuming fenets data — stay off in simple mode); you are the robustness
-layer. `eco_check_cross_module_polarity.py` (Check 68, above) is the ONE exception: it is a
+unresolved/ambiguous study). Check 68's findings never stop the flow (see item 12), but every single
+one must be investigated and land in the CHECK-68 section above as fixed, dismissed, or inconclusive —
+never silently skipped (a real bug was once dismissed without investigation here and only caught later
+by a real Formality failure). Do NOT run `eco_validate_step3.py` or `eco_functional_precheck.py` (those
+hard-gate validators — dozens of checks assuming fenets data — stay off in simple mode); you are the
+robustness layer. `eco_check_cross_module_polarity.py` (Check 68, above) is the ONE exception: it is a
 lightweight, self-contained, fenets-free structural script, not the full validator, and running it is
 MANDATORY (for visibility), but its output is advisory only.
