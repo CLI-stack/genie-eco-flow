@@ -20,7 +20,10 @@ all scripts under `GENIE_ROOT/script/eco_scripts/`.
 `RUN_FENETS` (`true`/`false`, default `false`), and — only when `RUN_FENETS=true` —
 `FM_SESSION_DIR` (a TileBuilder directory, separate from `REF_DIR`, containing an already-validated
 PreEco FM target) and `PREECO_TARGETS` (comma-separated per-stage target names the entry point already
-validated). See STEP 2 below.
+validated). See STEP 2 below. Also optionally `LIB_DIR` (an absolute path to a real standard-cell
+Liberty library release — e.g. a PDK root or `libreldir`-style symlink — supplied by the user for the
+direct-paths input style, where `REF_DIR` is a shim dir with no `tech/` tree of its own). See PRE-FLIGHT
+step 5 below.
 
 ## Correctness posture (READ THIS)
 There is **no FM and no validator to catch a mistake** in simple mode. Correctness rests entirely on:
@@ -83,6 +86,36 @@ that's the tool being conservative, not proof the polarity is unrecoverable.
    verifier, applier) iterates **only** `STAGES` — never assume PrePlace/Route are present. If a
    stage's PreEco netlist is absent, it is simply not processed (no error).
 4. Return to `<BASE_DIR>` (GENIE_ROOT) for running scripts.
+5. **Determine the Liberty cell-data source** (needed by `eco_cell_truth_tables.py` /
+   `eco_verify_boolean_fold.py` for and_term/combinational-fold verification — see
+   `eco_netlist_studier.md`). Complete mode gets real vendor data for free because its `REF_DIR` is
+   always a genuine TileBuilder directory; simple mode's `REF_DIR` may be a shim with no `tech/` tree
+   (direct-paths input style), so this step is fully automatic and must never hard-stop:
+   ```bash
+   cd <BASE_DIR>
+   if [ -d "<REF_DIR>/tech/synopsys/ccs" ]; then
+       python3 script/eco_scripts/eco_liberty_extractor.py --ref-dir <REF_DIR>
+       LIBRARY_SOURCE=real_tile_cache
+   elif [ -n "<LIB_DIR>" ]; then
+       python3 script/eco_scripts/eco_liberty_extractor.py --ref-dir <REF_DIR> --lib-dir <LIB_DIR>
+       LIBRARY_SOURCE=real_user_provided
+   else
+       LIBRARY_SOURCE=bundled_fallback
+   fi
+   ```
+   - The first branch covers simple mode's TileBuilder-directory input style (same physical layout as
+     complete mode) — runs unconditionally, no question ever asked; instant if the cache already
+     exists (`eco_liberty_extractor.py`'s own `--force`-gated skip).
+   - The second branch only fires if the entry point collected an optional `LIB_DIR` from the user
+     (most runs will not have this — do NOT treat its absence as an error).
+   - **If the extractor is invoked but exits non-zero** (bad/empty `--lib-dir`, no Liberty files
+     found) — this is "script-bug / missing-infra" territory, not a correctness fail-close (see the
+     Script-bug self-fix rule above): catch it and fall through to `LIBRARY_SOURCE=bundled_fallback`
+     rather than stopping the flow. Simple mode is for evaluation; missing library infra must never
+     block it.
+   - Write the resolved value, once, to `<AI_ECO_FLOW_DIR>/<TAG>_eco_library_source.txt` (one line:
+     `real_tile_cache` / `real_user_provided` / `bundled_fallback`). Step 3 reads this file rather than
+     re-deriving it — see `eco_netlist_studier.md`'s Method A step 5.
 
 ---
 
@@ -186,7 +219,12 @@ NOT re-derive it. (No-op JSON if there are no `and_term` changes.)
 Relay: `"Step 3-pre OK — GAP-15 classified (<N> and_term / none). Next: 3a studier."`
 
 **3a.** Spawn a **foreground** sub-agent (blocking — no `run_in_background`) with
-`GENIE_ROOT/config/eco_agents_simple/eco_netlist_studier.md` prepended. Pass
+`GENIE_ROOT/config/eco_agents_simple/eco_netlist_studier.md` **AND**
+`GENIE_ROOT/config/eco_agents/eco_netlist_studier.md` both prepended (same pattern as
+`CRITICAL_RULES_FAST.md`+`CRITICAL_RULES.md` above — the simple-mode doc only overrides *net-identity
+resolution*; and_term/combinational-fold construction (Method A/B/C), the `eco_verify_boolean_fold.py`
+step-5 mandate, and all other correctness rules live ONLY in the complete-mode doc and must be in the
+agent's context directly, not read-on-reference). Pass
 `REF_DIR TILE JIRA TAG BASE_DIR AI_ECO_FLOW_DIR`, the RTL-diff path, and `GAP15_CHECK_PATH`. **Check
 whether `<AI_ECO_FLOW_DIR>/<TAG>_eco_fenets_rename_map.json` exists** (Step 2 ran and succeeded) — if
 so, also pass it as `RENAME_MAP`; the studier uses it as the higher-priority resolution source per its
@@ -282,11 +320,32 @@ continue to Step 4 regardless of what it reports.
 Relay: `"Step 3c2 OK — cross-module polarity check clean."` or `"Step 3c2 — <C>/<M> informational
 findings (see <TAG>_eco_cross_module_polarity.json), continuing."`
 
+**Before declaring anything irreducible — if `RUN_FENETS=true`, ask the FM session you already have,
+don't wait to escalate.** A net can reach the point of "structural tracing has genuinely hit its
+limit — two independent methods conflict, or none produce a clean result" (Rule 40 is satisfied: every
+structural method really was tried). When that happens AND Step 2 already validated an `FM_SESSION_DIR`
+for this run, that FM access is sitting right there, unused — do not default to "punt to complete mode"
+as the first resort; make ONE targeted, single-net query against it first:
+```bash
+csh script/rtg_oss_feint/supra/find_equivalent_nets.csh \
+    "refDir:<FM_SESSION_DIR>" "<TAG>" "target:<the validated PreEco target name>" \
+    "netName:<the one disputed net, scoped path>" "tile:<TILE>"
+```
+This is the SAME script and the SAME validated session Step 2 already used — a single extra net costs
+a few minutes, not another ~60-minute fenets pass. Fold the real result into the entry's resolution
+(same as any other fenets-sourced data — it overrides structural guesswork per Rule 39/40) and
+re-attempt the exhaustive proof with it. Only fall through to the STOP condition below if this targeted
+query ALSO fails to settle it (session unreachable, net not found, result itself ambiguous), or if
+`RUN_FENETS=false` (no FM session exists at all for this run to query). Record which path was taken —
+"settled via targeted fenets query" vs. "no FM session available / query itself inconclusive" — in the
+entry's `notes` so it's clear why a stop was or wasn't needed.
+
 **CHECKPOINT:** `<TAG>_eco_preeco_study.json` has entries for ≥1 stage, and BOTH the agent-authored
 `<TAG>_eco_step3_netlist_study.rpt` (what the gate-level ECO does) and `<TAG>_eco_step3_netlist_verify.rpt` exist. If
 the verifier flagged any `NET-ABSENT-IN-STAGE`, `UNRESOLVABLE`, or `polarity_undetermined` entry
 (meaning: genuinely irreducible even after the deeper-tracing investigation `eco_netlist_studier.md`
-requires — not just the tool's first-pass conservative result) →
+requires, INCLUDING the targeted fenets query above when one was available — not just the tool's
+first-pass conservative result) →
 **STOP and relay** what completed + the exact flagged entries:
 `"Step 3 STOPPED — verifier flagged <entry>: <NET-ABSENT/polarity_undetermined>. Completed Steps 1,
 3-pre, 3a, 3b, 3c, 3c2; study + both step3 RPTs written under <AI_ECO_FLOW_DIR>. Punt the flagged

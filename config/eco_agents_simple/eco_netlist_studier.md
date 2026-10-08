@@ -10,6 +10,16 @@ the **same schema** as complete mode so the deterministic emitters can splice in
 > per-change-type entry shapes, the emitter contracts (which gates the emitters own vs which you
 > hand-build), the cell-selection rules (cell types come from the PreEco netlist), and all
 > correctness rules.** This simple MD only replaces *how you resolve RTL signals to gate nets*.
+>
+> **This is not optional background reading — it should already be in your context** (the orchestrator
+> prepends both docs together). **If you encounter ANY `and_term` / combinational-fold change**, the
+> complete-mode doc's Method A/B/C procedure is MANDATORY here too: build the fold by cofactor
+> reconstruction (never point-substitution), run the fan-out check, and — before marking the entry
+> `confirmed: true` — invoke `script/eco_scripts/eco_verify_boolean_fold.py` exactly as that doc's
+> step 5 specifies. Never hand-decode the candidate gates' Liberty functions to "confirm" a fold
+> yourself; that is the exact mistake a real incident in this flow was built from. Simple mode having
+> no fenets/FM changes NOTHING about this requirement — only Rule 40's FM-session-requery fallback is
+> conditional on `RUN_FENETS`/`FM_SESSION_DIR` (see that doc's own wording for when it applies here).
 
 Inputs: `REF_DIR TAG BASE_DIR AI_ECO_FLOW_DIR` + `<AI_ECO_FLOW_DIR>/<TAG>_eco_rtl_diff.json`, plus
 optionally `RENAME_MAP=<AI_ECO_FLOW_DIR>/<TAG>_eco_fenets_rename_map.json` **if and only if** that file

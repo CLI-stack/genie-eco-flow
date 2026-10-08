@@ -174,6 +174,14 @@ All four inputs are **REQUIRED** — there are no defaults, including `mode`.
        (`RTL_BEFORE: … RTL_AFTER: … NETLIST_SYNTH: …`) and ask only for missing REQUIRED fields.
        If the user gives only `NETLIST_SYNTH`, proceed Synth-only — do NOT ask for PrePlace/Route.
        This style routes through **step 1b**.
+       - **Also optionally collect `LIB_DIR`** (direct-paths style only — TileBuilder-dir style
+         gets real Liberty data automatically from its own `tech/synopsys/ccs/`, nothing to ask).
+         Ask once, worded so skipping is clearly the expected default:
+         *"Optional: path to a real standard-cell Liberty library release (a PDK root or
+         `libreldir`-style symlink) — improves and_term/combinational-fold verification confidence
+         in Step 3. Press enter to skip."* No validation needed here — an empty answer or a bad
+         path both degrade gracefully to the bundled fallback cell data (see
+         `SIMPLE_ORCHESTRATOR.md` PRE-FLIGHT step 5), never a hard stop.
 
    **Q4 — jira.** The ECO ticket number, e.g. `9899`.
 
@@ -224,7 +232,9 @@ All four inputs are **REQUIRED** — there are no defaults, including `mode`.
    `eco_orchestrator` agent (this plugin), passing the block's fields (`TAG REF_DIR TILE JIRA
    LOG_FILE SPEC_FILE`) **plus `MODE=<mode>`** (`complete` or `simple`). For `simple` mode, also pass
    `RUN_FENETS=<true|false>` and, when `true`, `FM_SESSION_DIR=<path>` and
-   `PREECO_TARGETS=<validated names>` from Q2 (simple mode). The orchestrator branches on MODE: `complete` runs the
+   `PREECO_TARGETS=<validated names>` from Q2 (simple mode), plus `LIB_DIR=<path>` if the user supplied
+   one for the direct-paths style (omit entirely if skipped — `SIMPLE_ORCHESTRATOR.md` treats a
+   missing `LIB_DIR` as "no real library available," not an error). The orchestrator branches on MODE: `complete` runs the
    full STUDY -> APPLY -> ROUND -> FINAL state machine with all hard gates (always with fenets);
    `simple` runs Steps 1,(2 optional),3,4 (via `config/eco_agents_simple/SIMPLE_ORCHESTRATOR.md`,
    which branches on `RUN_FENETS` for its optional Step 2) and stops. Do NOT run the phases yourself.
@@ -280,4 +290,9 @@ All four inputs are **REQUIRED** — there are no defaults, including `mode`.
   netlist it currently points at; any target whose session has actually been run (pass or fail) is
   accepted. See `SIMPLE_ORCHESTRATOR.md` STEP 2 for the full validation/fallback behavior. Fenets failure/timeout in
   simple mode is non-fatal — Step 3 always proceeds, with or without a rename map.
+- **`LIB_DIR` (direct-paths style only) is a separate, genuinely optional input** for real Liberty
+  cell-truth-table data, unrelated to fenets/`FM_SESSION_DIR`. Most direct-paths runs will skip it —
+  that's expected, not a degraded run: the flow falls back to a bundled hand-curated cell-data set and
+  discloses that fact in Step 3's entries rather than silently claiming vendor-grade confidence. See
+  `SIMPLE_ORCHESTRATOR.md` PRE-FLIGHT step 5.
 - This command does not modify any genie_agent file; it only launches the existing flow.
