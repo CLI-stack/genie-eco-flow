@@ -129,6 +129,13 @@ All four inputs are **REQUIRED** — there are no defaults, including `mode`.
    - If `mode == simple`: ask which input style the user wants:
      - **TileBuilder directory** — an absolute path containing `revrc.main`; or
      - **direct paths** — `RTL_BEFORE`, `RTL_AFTER` (each a `.v` file OR a directory) and `NETLIST_SYNTH` (**required**), plus `NETLIST_PREPLACE` / `NETLIST_ROUTE` (**optional** — omit for Synthesize-only run). Then go to **step 1b**.
+       - **Also optionally collect `LIB_DIR`** (direct-paths style only — TileBuilder-dir style gets
+         real Liberty data automatically from its own `tech/synopsys/ccs/`, nothing to ask). Ask once,
+         worded so skipping is clearly the expected default: *"Optional: path to a real standard-cell
+         Liberty library release (a PDK root or `libreldir`-style symlink) — improves
+         and_term/combinational-fold verification confidence in Step 3. Press enter to skip."* No
+         validation needed — an empty answer or a bad path both degrade gracefully to the bundled
+         fallback cell data (see `SIMPLE_ORCHESTRATOR.md` PRE-FLIGHT step 5), never a hard stop.
 
    **Q4 — jira.** The ECO ticket number, e.g. `9855`.
 
@@ -159,9 +166,12 @@ All four inputs are **REQUIRED** — there are no defaults, including `mode`.
 
 3. **Hand off to the orchestrator:**
    - **For `simple` mode with `RUN_FENETS=false` (the default):** Spawn a **FOREGROUND** (blocking) sub-agent with `GENIE_ROOT/config/eco_agents_simple/SIMPLE_ORCHESTRATOR.md` prepended:
-     `INPUTS: TAG=<tag> REF_DIR=<ref_dir> TILE=<tile> JIRA=<jira> LOG_FILE=<log_file> SPEC_FILE=<spec_file> BASE_DIR=<base_dir> AI_ECO_FLOW_DIR=<ai_eco_flow_dir> RUN_FENETS=false`.
+     `INPUTS: TAG=<tag> REF_DIR=<ref_dir> TILE=<tile> JIRA=<jira> LOG_FILE=<log_file> SPEC_FILE=<spec_file> BASE_DIR=<base_dir> AI_ECO_FLOW_DIR=<ai_eco_flow_dir> RUN_FENETS=false`,
+     plus `LIB_DIR=<path>` if the user supplied one for the direct-paths style (omit entirely if
+     skipped — `SIMPLE_ORCHESTRATOR.md` treats a missing `LIB_DIR` as "no real library available,"
+     not an error, and falls back to bundled cell data).
      Wait for completion and verify `<AI_ECO_FLOW_DIR>/<TAG>_simple_phase_exited.marker` exists.
-   - **For `simple` mode with `RUN_FENETS=true`:** Spawn the SAME sub-agent, but in the **BACKGROUND** (same pattern as complete mode below), since its optional Step 2 can take up to ~60 minutes of FM polling/retry — do not block the session that long in the foreground. Pass the same INPUTS plus `RUN_FENETS=true FM_SESSION_DIR=<path> PREECO_TARGETS=<validated names>`. Relay that Step 2 is running in the background before Steps 1/3/4 resume in the foreground once it returns (per `SIMPLE_ORCHESTRATOR.md`'s own internal foreground/background split). Wait for its notification and verify the exit marker as above.
+   - **For `simple` mode with `RUN_FENETS=true`:** Spawn the SAME sub-agent, but in the **BACKGROUND** (same pattern as complete mode below), since its optional Step 2 can take up to ~60 minutes of FM polling/retry — do not block the session that long in the foreground. Pass the same INPUTS plus `RUN_FENETS=true FM_SESSION_DIR=<path> PREECO_TARGETS=<validated names>` and `LIB_DIR=<path>` if given. Relay that Step 2 is running in the background before Steps 1/3/4 resume in the foreground once it returns (per `SIMPLE_ORCHESTRATOR.md`'s own internal foreground/background split). Wait for its notification and verify the exit marker as above.
    - **For `complete` mode:** Spawn background sub-agents following `GENIE_ROOT/config/eco_agents/STUDY_ORCHESTRATOR.md` → `APPLY_ORCHESTRATOR.md` → `ROUND_ORCHESTRATOR.md` → `FINAL_ORCHESTRATOR.md` with all hard gates enforced (always runs fenets).
 
 3b. **(simple + direct-input style only) Write back patched netlists:**
