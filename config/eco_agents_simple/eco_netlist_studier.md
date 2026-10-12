@@ -20,6 +20,29 @@ the **same schema** as complete mode so the deterministic emitters can splice in
 > yourself; that is the exact mistake a real incident in this flow was built from. Simple mode having
 > no fenets/FM changes NOTHING about this requirement — only Rule 40's FM-session-requery fallback is
 > conditional on `RUN_FENETS`/`FM_SESSION_DIR` (see that doc's own wording for when it applies here).
+> **For METHOD B/C specifically, that doc's `eco_verify_consumer_completeness.py` requirement is
+> equally mandatory here** — step 5 only proves the new gate logic; it does not prove every real
+> consumer of the replaced net got rewired correctly, which is its own separate, real failure mode.
+>
+> **Do not declare `UNRESOLVABLE` just because METHOD A's private-point search came up empty — that
+> is a real incident this flow has already hit in simple mode, not a hypothetical.** A run searched
+> exhaustively for a METHOD A candidate, found every candidate entangled with unrelated structures,
+> and stopped at `UNRESOLVABLE` without ever checking whether METHOD B was viable — it was: every real
+> RTL operand the clause needed was a real, driven net elsewhere in the netlist, confirmed by direct
+> grep. **Before writing `UNRESOLVABLE`, always check the complete-mode doc's "failed METHOD A search
+> is not grounds for UNRESOLVABLE on its own" rule and attempt METHOD B if its prerequisite (real RTL
+> operands exist) is met.** Having no automatic FM re-verify after applying is a reason to be MORE
+> rigorous with both verify scripts and with Rule 40's targeted FM-query fallback — not a reason to
+> stop at the first dead end.
+>
+> **That same incident's actual resolution is the concrete lesson on HOW to attempt METHOD B when a
+> shared node blocks METHOD A: query FM about the ambiguous DOWNSTREAM signal, not the upstream operand
+> you already traced.** The first attempt's Rule-40 fallback query only re-asked FM about the net it
+> already understood (the shared node's own inputs) and learned nothing new. The successful re-attempt
+> queried the actual RTL-level signal whose gate-level identity was in question — a single targeted
+> query that immediately named the exact net and its dedicated consumer pin, closing out what
+> "structural inspection alone" genuinely could not resolve. See the complete-mode doc's matching
+> paragraph for the full worked example before declaring any and_term entry `UNRESOLVABLE`.
 
 Inputs: `REF_DIR TAG BASE_DIR AI_ECO_FLOW_DIR` + `<AI_ECO_FLOW_DIR>/<TAG>_eco_rtl_diff.json`, plus
 optionally `RENAME_MAP=<AI_ECO_FLOW_DIR>/<TAG>_eco_fenets_rename_map.json` **if and only if** that file
