@@ -24,6 +24,16 @@ the **same schema** as complete mode so the deterministic emitters can splice in
 > equally mandatory here** — step 5 only proves the new gate logic; it does not prove every real
 > consumer of the replaced net got rewired correctly, which is its own separate, real failure mode.
 >
+> **That doc's step 1b MODULE-SCOPE PROVENANCE CHECK is equally mandatory here, for every METHOD A
+> candidate — including one sourced from an optional Step-2 fenets rename_map, since simple mode
+> can still have fenets.** A real shipped bug (an and_term resolution, run in simple mode) accepted
+> a candidate net that was genuinely value-equivalent but declared in an unrelated SIBLING module —
+> a coincidental cross-module match, not the target signal. Before
+> accepting any FM/fenets candidate, independently re-derive its declaring module from the real
+> netlist and cross-check it against `module_name` and `eco_rtl_diff.json`'s
+> `modules_with_rtl_changes` exactly as that step specifies — never accept a candidate on
+> value-equivalence alone.
+>
 > **Do not declare `UNRESOLVABLE` just because METHOD A's private-point search came up empty — that
 > is a real incident this flow has already hit in simple mode, not a hypothetical.** A run searched
 > exhaustively for a METHOD A candidate, found every candidate entangled with unrelated structures,

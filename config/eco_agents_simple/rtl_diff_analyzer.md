@@ -11,6 +11,15 @@ extract ALL changes between PreEco and PostEco RTL, classify each into a `change
 > `condition_gate_chain`, `equality_decode`, `d_input_has_reset_context`, etc.). Produce the **same
 > JSON schema** — downstream simple-mode emitters read the identical fields.
 
+> **Step A2 (Module-Change Manifest) applies here too, unchanged — it is part of the shared JSON
+> schema, not a complete-mode-only mechanic.** For every file the diff reports as genuinely
+> differing, resolve its declaring module and add it to a top-level `modules_with_rtl_changes`
+> list in `eco_rtl_diff.json`. The simple-mode studier and verifier both require this field for
+> their Method-A module-scope provenance check (a candidate net whose module never appears here
+> cannot be the target signal, however value-equivalent it looks) — simple mode having no fenets
+> makes this check MORE important, not less, since there is no FM safety net to catch the mistake
+> downstream.
+
 ## Simple-mode deltas (the only differences from complete mode)
 1. **MANDATORY — Exhaustive Multi-File Inspection (Zero-Assumption Rule):**
    - Run `diff -rqw --exclude="*.vf" --exclude="*.vfe" --exclude="*.d" <REF_DIR>/data/PreEco/SynRtl/ data/SynRtl/` across the full RTL tree.

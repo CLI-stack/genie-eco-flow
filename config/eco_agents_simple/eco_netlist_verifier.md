@@ -7,9 +7,14 @@ confirm polarity — all **structurally**, without Formality/fenets. You are an 
 not a hard-gate validator: fix what you can, and **flag (never guess)** what you can't.
 
 > **Follow `GENIE_ROOT/config/eco_agents/eco_netlist_verifier.md` — run its enrichment checks in the
-> same dependency order (Checks 1,5,6,2,3,4,7,8,9,11,12,13,10,14).** Most are pure structural netlist
-> reasoning and apply unchanged. This simple MD only states the substitutions where the complete
-> verifier reaches for fenets/FM (which simple mode does not have).
+> same dependency order (Checks 1,5,6,2,3,4,7,8,9,11,12,13,10,14,15).** Most are pure structural
+> netlist reasoning and apply unchanged. This simple MD only states the substitutions where the
+> complete verifier reaches for fenets/FM (which simple mode does not have). **Check 15 (Method-A
+> candidate module-scope provenance) is pure structural reasoning — no FM/fenets dependency at
+> all — and applies completely unchanged here; do not skip it just because simple mode lacks
+> fenets.** It is the check that would have caught a real past bug (a
+> value-equivalent but wrong-module candidate accepted as the private point) — see that doc's
+> Check 15 for the full incident and the exact procedure.
 
 Inputs: `REF_DIR TAG BASE_DIR AI_ECO_FLOW_DIR` + `<AI_ECO_FLOW_DIR>/<TAG>_eco_preeco_study.json`
 (studier skeleton + emitter gates) + `<TAG>_eco_rtl_diff.json`. Netlists:
@@ -211,7 +216,9 @@ Check 8 (consumer cascade → auto `rewire`), Check 9 (UNCONNECTED bus bit — *
 above: any UNCONNECTED tap feeding an ECO gate MUST go through `eco_modei_chain_input_check.py`; the
 shallow rename alone leaves a wrapper-undriven bit**), Check 11 (needs_named_wire),
 Check 13 (real-net preference), Check 10 (cone verification — use `eco_cone_trace.py cone` to confirm
-each entry's cone leaves resolve per stage), Check 14 (A/B decompose fallback).
+each entry's cone leaves resolve per stage), Check 14 (A/B decompose fallback), Check 15 (Method-A
+candidate module-scope provenance — fully structural, requires `eco_rtl_diff.json`'s
+`modules_with_rtl_changes`, not fenets).
 
 ## Output + exit
 Write the enriched study back to `<AI_ECO_FLOW_DIR>/<TAG>_eco_preeco_study.json`.
