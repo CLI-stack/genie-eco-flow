@@ -14,7 +14,9 @@ not a hard-gate validator: fix what you can, and **flag (never guess)** what you
 > all — and applies completely unchanged here; do not skip it just because simple mode lacks
 > fenets.** It is the check that would have caught a real past bug (a
 > value-equivalent but wrong-module candidate accepted as the private point) — see that doc's
-> Check 15 for the full incident and the exact procedure.
+> Check 15 for the full incident and the exact procedure. **Its touched-but-different-module
+> exception requires a passing `eco_verify_cone_equivalence.py` run, not a prose trace — same
+> requirement as complete mode.**
 
 Inputs: `REF_DIR TAG BASE_DIR AI_ECO_FLOW_DIR` + `<AI_ECO_FLOW_DIR>/<TAG>_eco_preeco_study.json`
 (studier skeleton + emitter gates) + `<TAG>_eco_rtl_diff.json`. Netlists:

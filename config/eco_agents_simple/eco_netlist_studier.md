@@ -32,7 +32,9 @@ the **same schema** as complete mode so the deterministic emitters can splice in
 > accepting any FM/fenets candidate, independently re-derive its declaring module from the real
 > netlist and cross-check it against `module_name` and `eco_rtl_diff.json`'s
 > `modules_with_rtl_changes` exactly as that step specifies — never accept a candidate on
-> value-equivalence alone.
+> value-equivalence alone. **The touched-but-different-module exception requires a passing
+> `eco_verify_cone_equivalence.py` run, not a prose trace** — same requirement as complete mode,
+> no exception for simple mode's lack of FM.
 >
 > **Do not declare `UNRESOLVABLE` just because METHOD A's private-point search came up empty — that
 > is a real incident this flow has already hit in simple mode, not a hypothetical.** A run searched
